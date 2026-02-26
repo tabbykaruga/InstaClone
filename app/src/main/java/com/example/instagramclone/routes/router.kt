@@ -10,4 +10,6 @@ sealed class DestinationScreen(val route: String) {
   object Search : DestinationScreen("search")
 
   object MyPost : DestinationScreen("myPost")
+
+  object Profile : DestinationScreen("profile")
 }
