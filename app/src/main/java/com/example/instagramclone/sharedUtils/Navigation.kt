@@ -21,6 +21,6 @@ fun CheckSignedIn(navController: NavController, vm: AuthViewModel) {
 
   if (signedIn && !alreadyLoggedIn.value) {
     alreadyLoggedIn.value = true
-    navController.navigate(DestinationScreen.Feed.route) { popUpTo(0) }
+    navController.navigate(DestinationScreen.MyPost.route) { popUpTo(0) }
   }
 }
