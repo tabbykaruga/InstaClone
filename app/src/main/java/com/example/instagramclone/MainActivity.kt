@@ -15,12 +15,15 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.example.instagramclone.data.PostData
 import com.example.instagramclone.routes.DestinationScreen
 import com.example.instagramclone.screens.FeedScreen
 import com.example.instagramclone.screens.SearchScreen
 import com.example.instagramclone.screens.auth.LoginScreen
 import com.example.instagramclone.screens.auth.SignUpScreen
-import com.example.instagramclone.screens.profile.MyPostScreen
+import com.example.instagramclone.screens.posts.MyPostScreen
+import com.example.instagramclone.screens.posts.NewPostScreen
+import com.example.instagramclone.screens.posts.SinglePostScreen
 import com.example.instagramclone.screens.profile.ProfileScreen
 import com.example.instagramclone.sharedUtils.NotificationMessage
 import com.example.instagramclone.ui.theme.InstagramCloneTheme
@@ -33,6 +36,7 @@ class MainActivity : ComponentActivity() {
     super.onCreate(savedInstanceState)
     enableEdgeToEdge()
     WindowCompat.getInsetsController(window, window.decorView).isAppearanceLightStatusBars = true
+    CloudinaryManager.init(this)
     setContent {
       InstagramCloneTheme {
         Scaffold(containerColor = Color.White) { padding ->
@@ -68,6 +72,15 @@ fun InstagramApp(
     }
     composable(DestinationScreen.Profile.route) {
       ProfileScreen(navController = navController, vm = vm)
+    }
+    composable(DestinationScreen.NewPost.route) { navBackStackEntry ->
+      val imageUri = navBackStackEntry.arguments?.getString("imageUri")
+      imageUri?.let { NewPostScreen(navController = navController, vm = vm, encodedUri = it) }
+    }
+    composable(DestinationScreen.SinglePost.route) {
+      val postData =
+          navController.previousBackStackEntry?.arguments?.getParcelable<PostData>("post")
+      postData?.let { SinglePostScreen(navController = navController, vm = vm, post = postData) }
     }
   }
 }
