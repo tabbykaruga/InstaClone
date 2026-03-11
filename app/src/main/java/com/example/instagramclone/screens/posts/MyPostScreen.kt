@@ -114,7 +114,7 @@ fun MyPostScreen(navController: NavController, vm: AuthViewModel) {
       ) {
         Text("Edit Profile", color = Color.Black)
       }
-      PostList(
+      PostLists(
           isContextLoading = isLoading,
           postLoading = isPostLoading,
           posts = posts,
@@ -134,7 +134,7 @@ fun MyPostScreen(navController: NavController, vm: AuthViewModel) {
 }
 
 @Composable
-fun PostList(
+fun PostLists(
     isContextLoading: Boolean,
     postLoading: Boolean,
     posts: List<PostData>,

@@ -13,6 +13,8 @@ import com.example.instagramclone.data.Event
 import com.example.instagramclone.data.PostData
 import com.example.instagramclone.data.UserData
 import com.example.instagramclone.sharedUtils.ImageUploader
+import com.example.instagramclone.sharedUtils.fillerWords
+import com.example.instagramclone.sharedUtils.handleException
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.QuerySnapshot
@@ -20,6 +22,7 @@ import com.google.firebase.firestore.ktx.toObject
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.io.File
 import java.io.FileOutputStream
+import java.util.Locale
 import java.util.UUID
 import javax.inject.Inject
 
@@ -36,8 +39,13 @@ constructor(val auth: FirebaseAuth, val db: FirebaseFirestore, application: Appl
   val userData = mutableStateOf<UserData?>(null)
   val popupNotification = mutableStateOf<Event<String>?>(null)
 
+  // POST
   val refreshPostProgress = mutableStateOf(false)
   val posts = mutableStateOf<List<PostData>>(listOf())
+
+  // SEARCH
+  val searchedPosts = mutableStateOf<List<PostData>>(listOf())
+  val searchedPostProgress = mutableStateOf(false)
 
   init {
     val currentUser = auth.currentUser
@@ -241,6 +249,8 @@ constructor(val auth: FirebaseAuth, val db: FirebaseFirestore, application: Appl
     }
   }
 
+  // ----------------- POST --------------
+
   fun onCreateNewPost(
       imageUri: Uri,
       description: String,
@@ -259,6 +269,12 @@ constructor(val auth: FirebaseAuth, val db: FirebaseFirestore, application: Appl
 
             val postUuid = UUID.randomUUID().toString()
 
+            val searchTerms =
+                description
+                    .split(" ", ".", ",", "?", "!", "#")
+                    .map { it.lowercase() }
+                    .filter { it.isNotEmpty() and !fillerWords.contains(it) }
+
             val post =
                 PostData(
                     postId = postUuid,
@@ -269,7 +285,8 @@ constructor(val auth: FirebaseAuth, val db: FirebaseFirestore, application: Appl
                     postDescription = description,
                     postLocation = location,
                     time = System.currentTimeMillis(),
-                    likes = listOf<String>(),
+                    likes = listOf(),
+                    searchTerms = searchTerms,
                 )
 
             db.collection(POSTS)
@@ -333,11 +350,21 @@ constructor(val auth: FirebaseAuth, val db: FirebaseFirestore, application: Appl
     outState.value = sortedPosts
   }
 
-  fun handleException(exception: Exception? = null, customMessage: String = "") {
-    exception?.printStackTrace()
+  fun searchPost(searchTerm: String) {
+    if (searchTerm.isNotEmpty()) {
+      searchedPostProgress.value = true
 
-    val errorMsg = exception?.localizedMessage ?: ""
-    val message = if (customMessage.isEmpty()) errorMsg else "$customMessage: $errorMsg"
-    popupNotification.value = Event(message)
+      db.collection(POSTS)
+          .whereArrayContains("searchTerms", searchTerm.trim().lowercase(Locale.ROOT))
+          .get()
+          .addOnSuccessListener {
+            convertPosts(it, searchedPosts)
+            searchedPostProgress.value = false
+          }
+          .addOnFailureListener { e ->
+            handleException(e, "Cannot search post")
+            searchedPostProgress.value = false
+          }
+    }
   }
 }

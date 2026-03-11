@@ -17,14 +17,14 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.instagramclone.data.PostData
 import com.example.instagramclone.routes.DestinationScreen
-import com.example.instagramclone.screens.FeedScreen
-import com.example.instagramclone.screens.SearchScreen
 import com.example.instagramclone.screens.auth.LoginScreen
 import com.example.instagramclone.screens.auth.SignUpScreen
+import com.example.instagramclone.screens.feeds.FeedScreen
 import com.example.instagramclone.screens.posts.MyPostScreen
 import com.example.instagramclone.screens.posts.NewPostScreen
 import com.example.instagramclone.screens.posts.SinglePostScreen
 import com.example.instagramclone.screens.profile.ProfileScreen
+import com.example.instagramclone.screens.search.SearchScreen
 import com.example.instagramclone.sharedUtils.NotificationMessage
 import com.example.instagramclone.ui.theme.InstagramCloneTheme
 import com.example.instagramclone.viewModel.AuthViewModel

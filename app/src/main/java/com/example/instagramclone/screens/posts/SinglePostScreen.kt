@@ -4,6 +4,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -16,6 +17,7 @@ import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
@@ -81,6 +83,15 @@ fun SinglePostDisplay(navController: NavController, vm: AuthViewModel, post: Pos
       if (userData?.userId != post.userId) {
         Text("Follow", color = Color.Blue, modifier = Modifier.clickable {})
       }
+
+      Spacer(modifier = Modifier.weight(1f))
+      if (userData?.userId == post.userId) {
+        Icon(
+            imageVector = Icons.Outlined.DeleteOutline,
+            contentDescription = "delete",
+            modifier = Modifier.size(24.dp).clickable {},
+        )
+      }
     }
   }
   Box {
@@ -95,7 +106,7 @@ fun SinglePostDisplay(navController: NavController, vm: AuthViewModel, post: Pos
         imageVector = if (isLiked) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
         contentDescription = "Like",
         tint = if (isLiked) Color.Red else Color.Black,
-        modifier = Modifier.size(24.dp),
+        modifier = Modifier.size(24.dp).clickable {},
     )
     Text(" ${post.likes?.size ?: 0} likes", modifier = Modifier.padding(start = 0.dp))
   }
