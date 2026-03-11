@@ -82,5 +82,9 @@ fun InstagramApp(
           navController.previousBackStackEntry?.arguments?.getParcelable<PostData>("post")
       postData?.let { SinglePostScreen(navController = navController, vm = vm, post = postData) }
     }
+    composable(DestinationScreen.Comment.route) {
+      //      val postId = navBa
+      //      CommentsScreen(navController = navController, vm = vm, postId = postId)
+    }
   }
 }

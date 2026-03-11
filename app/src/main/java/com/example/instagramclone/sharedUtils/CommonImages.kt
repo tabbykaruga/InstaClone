@@ -77,7 +77,7 @@ fun CommonImage(
 }
 
 @Composable
-fun CloudinaryImage(
+fun GeneralPostImage(
     data: String?,
     modifier: Modifier,
     contentScale: ContentScale = ContentScale.Crop,

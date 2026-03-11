@@ -7,8 +7,10 @@ import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
 import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.AndroidViewModel
+import com.example.instagramclone.data.CommentsData
 import com.example.instagramclone.data.Event
 import com.example.instagramclone.data.PostData
 import com.example.instagramclone.data.UserData
@@ -18,6 +20,7 @@ import com.example.instagramclone.sharedUtils.handleException
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.QuerySnapshot
+import com.google.firebase.firestore.SetOptions
 import com.google.firebase.firestore.ktx.toObject
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.io.File
@@ -28,6 +31,7 @@ import javax.inject.Inject
 
 const val USERS = "users"
 const val POSTS = "posts"
+const val COMMENTS = "comments"
 
 @HiltViewModel
 class AuthViewModel
@@ -42,10 +46,18 @@ constructor(val auth: FirebaseAuth, val db: FirebaseFirestore, application: Appl
   // POST
   val refreshPostProgress = mutableStateOf(false)
   val posts = mutableStateOf<List<PostData>>(listOf())
+  val comment = mutableStateOf<List<CommentsData>>(listOf())
+  val commentProgress = mutableStateOf(false)
 
   // SEARCH
   val searchedPosts = mutableStateOf<List<PostData>>(listOf())
   val searchedPostProgress = mutableStateOf(false)
+
+  // FEED
+  //  val postFeed = mutableStateOf<List<PostData>>(listOf())
+  private val _userFeed = mutableStateOf<List<PostData>>(emptyList())
+  val userFeed: State<List<PostData>> = _userFeed
+  val postFeedProgress = mutableStateOf(false)
 
   init {
     val currentUser = auth.currentUser
@@ -121,6 +133,9 @@ constructor(val auth: FirebaseAuth, val db: FirebaseFirestore, application: Appl
     signedIn.value = false
     userData.value = null
     popupNotification.value = Event("Logged Out")
+    searchedPosts.value = emptyList()
+    _userFeed.value = emptyList()
+    comment.value = listOf()
   }
 
   private fun createOrUpdateProfile(
@@ -183,7 +198,10 @@ constructor(val auth: FirebaseAuth, val db: FirebaseFirestore, application: Appl
           val user = it.toObject<UserData>()
           userData.value = user
           inProgress.value = false
+          // refresh post
           refreshPost()
+          // update feed a new due to following
+          getPersonalizedFeed()
         }
         .addOnFailureListener { e ->
           handleException(e, "Cannot Retrieve user data")
@@ -337,6 +355,7 @@ constructor(val auth: FirebaseAuth, val db: FirebaseFirestore, application: Appl
     }
   }
 
+  // Build posts on top of each other
   private fun convertPosts(documents: QuerySnapshot, outState: MutableState<List<PostData>>) {
     val newPosts = mutableListOf<PostData>()
 
@@ -367,4 +386,130 @@ constructor(val auth: FirebaseAuth, val db: FirebaseFirestore, application: Appl
           }
     }
   }
+
+  // -------------------FOLLOWING /FOLLOWERS-----------------
+  fun onFollowClick(userId: String) {
+    auth.currentUser?.uid?.let { currentUser ->
+      val following = arrayListOf<String>()
+      userData.value?.following?.let { following.addAll(it) }
+      if (following.contains(userId)) {
+        following.remove(userId)
+      } else {
+        following.add(userId)
+      }
+
+      db.collection(USERS)
+          .document(currentUser)
+          .update("following", following)
+          .addOnSuccessListener { getUserData(currentUser) }
+          .addOnFailureListener { e ->
+            handleException(e, "Unable to follow/Unfollow. Please try again later.")
+          }
+    }
+  }
+
+  // -------------------FEED -----------------
+
+  private fun getPersonalizedFeed() {
+    val following = userData.value?.following
+
+    if (!following.isNullOrEmpty()) {
+      postFeedProgress.value = true
+      db.collection(POSTS)
+          .whereIn("userId", following)
+          .get()
+          .addOnSuccessListener {
+            convertPosts(documents = it, _userFeed)
+            if (userFeed.value.isEmpty()) {
+              getGeneralUserFeed()
+            } else {
+              postFeedProgress.value = false
+            }
+          }
+          .addOnFailureListener { e ->
+            handleException(
+                e,
+                "Unable to get feed at the moment.Please try again later.",
+            )
+            postFeedProgress.value = false
+          }
+    } else {
+      getGeneralUserFeed()
+    }
+  }
+
+  fun getGeneralUserFeed() {
+    postFeedProgress.value = true
+
+    // limit to last day not the whole db
+    val currentTime = System.currentTimeMillis()
+    val difference = 24 * 60 * 60 * 1000 // 1 day in milli sec
+
+    db.collection(POSTS)
+        .whereGreaterThan("time", currentTime - difference)
+        .get()
+        .addOnSuccessListener {
+          convertPosts(documents = it, _userFeed)
+          postFeedProgress.value = false
+        }
+        .addOnFailureListener { e ->
+          handleException(
+              e,
+              "Unable to get feed at the moment.Please try again later.",
+          )
+          postFeedProgress.value = false
+        }
+  }
+
+  fun onLikePost(postData: PostData) {
+    val userId = auth.currentUser?.uid ?: return
+    val currentLikes = postData.likes?.toMutableList() ?: mutableListOf()
+
+    val newLikes =
+        if (currentLikes.contains(userId)) {
+          currentLikes.filter { it != userId }.toMutableList() // unlike
+        } else {
+          currentLikes.apply { add(userId) } // like
+        }
+
+    // update local state immediately
+    val updatedPosts =
+        _userFeed.value.map { if (it.postId == postData.postId) it.copy(likes = newLikes) else it }
+    _userFeed.value = updatedPosts
+
+    // update firestore
+    postData.postId?.let { postId ->
+      db.collection(POSTS)
+          .document(postId)
+          .set(mapOf("likes" to newLikes), SetOptions.merge())
+          .addOnFailureListener { e -> handleException(e, "Unable to like post") }
+    }
+  }
+
+  fun createComment(postId: String, comment: String) {
+    userData.value?.username?.let { username ->
+      val commentId = UUID.randomUUID().toString()
+      val comment =
+          CommentsData(
+              commentId = commentId,
+              postId = postId,
+              username = username,
+              comment = comment,
+              time = System.currentTimeMillis(),
+          )
+
+      db.collection(COMMENTS)
+          .document(commentId)
+          .set(comment)
+          .addOnSuccessListener {
+            // get existing comments
+            getPreviousComments()
+          }
+          .addOnFailureListener { e ->
+            handleException(e, "Cannot be able to add a comment.Please try again later")
+          }
+    }
+  }
+
+  fun getPreviousComments() {}
 }

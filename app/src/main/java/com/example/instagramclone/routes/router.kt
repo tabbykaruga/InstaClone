@@ -18,4 +18,6 @@ sealed class DestinationScreen(val route: String) {
   }
 
   object SinglePost : DestinationScreen("singlePost")
+
+  object Comment : DestinationScreen("comment/{postId}")
 }

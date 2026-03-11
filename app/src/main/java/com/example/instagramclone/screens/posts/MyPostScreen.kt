@@ -33,8 +33,8 @@ import com.example.instagramclone.routes.DestinationScreen
 import com.example.instagramclone.screens.BottomNavItem
 import com.example.instagramclone.screens.BottomNavigationMenu
 import com.example.instagramclone.screens.profile.ProfileImage
-import com.example.instagramclone.sharedUtils.CloudinaryImage
 import com.example.instagramclone.sharedUtils.CommonProgressSpinner
+import com.example.instagramclone.sharedUtils.GeneralPostImage
 import com.example.instagramclone.sharedUtils.NavParam
 import com.example.instagramclone.sharedUtils.navigateTo
 import com.example.instagramclone.viewModel.AuthViewModel
@@ -72,6 +72,8 @@ fun MyPostScreen(navController: NavController, vm: AuthViewModel) {
   val isLoading = vm.inProgress.value
   val isPostLoading = vm.refreshPostProgress.value
   val posts = vm.posts.value
+  val following = userData?.following?.size ?: 0
+  val noOfPost = posts.size
 
   Column(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
     Column(modifier = Modifier.weight(1f).padding(top = 20.dp)) {
@@ -79,7 +81,7 @@ fun MyPostScreen(navController: NavController, vm: AuthViewModel) {
         ProfileImage(userData?.imageUrl) { newPostImageLauncher.launch("image/*") }
 
         Text(
-            "${posts.size} \nposts",
+            "$noOfPost \nposts",
             modifier = Modifier.weight(1f).align(Alignment.CenterVertically),
             textAlign = TextAlign.Center,
         )
@@ -89,7 +91,7 @@ fun MyPostScreen(navController: NavController, vm: AuthViewModel) {
             textAlign = TextAlign.Center,
         )
         Text(
-            "0 \nfollowing",
+            "$following \nfollowing",
             modifier = Modifier.weight(1f).align(Alignment.CenterVertically),
             textAlign = TextAlign.Center,
         )
@@ -193,7 +195,7 @@ fun PostImage(imageUrl: String?, modifier: Modifier) {
   Box(modifier = modifier) {
     val modifier = Modifier.padding(1.dp).fillMaxSize()
     if (imageUrl != null) {
-      CloudinaryImage(data = imageUrl, modifier = modifier, contentScale = ContentScale.Crop)
+      GeneralPostImage(data = imageUrl, modifier = modifier, contentScale = ContentScale.Crop)
     }
   }
 }

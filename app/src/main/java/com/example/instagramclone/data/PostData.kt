@@ -12,7 +12,7 @@ data class PostData(
     val postDescription: String? = null,
     val postLocation: String? = null,
     val time: Long? = null,
-    val likes: List<String>? = null,
+    var likes: List<String>? = null,
     val searchTerms: List<String>? = null,
 ) : Parcelable {
   constructor(
