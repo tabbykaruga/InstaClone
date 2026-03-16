@@ -7,7 +7,8 @@ import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
 import androidx.compose.runtime.MutableState
-import androidx.compose.runtime.State
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.AndroidViewModel
 import com.example.instagramclone.data.CommentsData
@@ -19,6 +20,7 @@ import com.example.instagramclone.sharedUtils.fillerWords
 import com.example.instagramclone.sharedUtils.handleException
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.QuerySnapshot
 import com.google.firebase.firestore.SetOptions
 import com.google.firebase.firestore.ktx.toObject
@@ -42,11 +44,13 @@ constructor(val auth: FirebaseAuth, val db: FirebaseFirestore, application: Appl
   val inProgress = mutableStateOf(false)
   val userData = mutableStateOf<UserData?>(null)
   val popupNotification = mutableStateOf<Event<String>?>(null)
+  val followers = mutableIntStateOf(0)
 
   // POST
   val refreshPostProgress = mutableStateOf(false)
   val posts = mutableStateOf<List<PostData>>(listOf())
-  val comment = mutableStateOf<List<CommentsData>>(listOf())
+  val comments = mutableStateOf<List<CommentsData>>(listOf())
+  val commentsMap = mutableStateMapOf<String, List<CommentsData>>()
   val commentProgress = mutableStateOf(false)
 
   // SEARCH
@@ -54,10 +58,8 @@ constructor(val auth: FirebaseAuth, val db: FirebaseFirestore, application: Appl
   val searchedPostProgress = mutableStateOf(false)
 
   // FEED
-  //  val postFeed = mutableStateOf<List<PostData>>(listOf())
-  private val _userFeed = mutableStateOf<List<PostData>>(emptyList())
-  val userFeed: State<List<PostData>> = _userFeed
-  val postFeedProgress = mutableStateOf(false)
+  val postsFeed = mutableStateOf<List<PostData>>(listOf())
+  val postsFeedProgress = mutableStateOf(false)
 
   init {
     val currentUser = auth.currentUser
@@ -133,9 +135,9 @@ constructor(val auth: FirebaseAuth, val db: FirebaseFirestore, application: Appl
     signedIn.value = false
     userData.value = null
     popupNotification.value = Event("Logged Out")
-    searchedPosts.value = emptyList()
-    _userFeed.value = emptyList()
-    comment.value = listOf()
+    searchedPosts.value = listOf()
+    postsFeed.value = listOf()
+    comments.value = listOf()
   }
 
   private fun createOrUpdateProfile(
@@ -202,6 +204,7 @@ constructor(val auth: FirebaseAuth, val db: FirebaseFirestore, application: Appl
           refreshPost()
           // update feed a new due to following
           getPersonalizedFeed()
+          getFollowers(user?.userId)
         }
         .addOnFailureListener { e ->
           handleException(e, "Cannot Retrieve user data")
@@ -297,8 +300,6 @@ constructor(val auth: FirebaseAuth, val db: FirebaseFirestore, application: Appl
                 PostData(
                     postId = postUuid,
                     userId = currentUid,
-                    userName = currentUsername,
-                    userImage = currentUserImage,
                     postImage = imageUrl, // ⭐ CLOUDINARY URL
                     postDescription = description,
                     postLocation = location,
@@ -408,22 +409,29 @@ constructor(val auth: FirebaseAuth, val db: FirebaseFirestore, application: Appl
     }
   }
 
+  private fun getFollowers(uId: String?) {
+    db.collection(USERS).whereArrayContains("following", uId ?: "").get().addOnSuccessListener {
+        documents ->
+      followers.intValue = documents.size()
+    }
+  }
+
   // -------------------FEED -----------------
 
   private fun getPersonalizedFeed() {
     val following = userData.value?.following
 
     if (!following.isNullOrEmpty()) {
-      postFeedProgress.value = true
+      postsFeedProgress.value = true
       db.collection(POSTS)
           .whereIn("userId", following)
           .get()
           .addOnSuccessListener {
-            convertPosts(documents = it, _userFeed)
-            if (userFeed.value.isEmpty()) {
+            convertPosts(documents = it, postsFeed)
+            if (postsFeed.value.isEmpty()) {
               getGeneralUserFeed()
             } else {
-              postFeedProgress.value = false
+              postsFeedProgress.value = false
             }
           }
           .addOnFailureListener { e ->
@@ -431,7 +439,7 @@ constructor(val auth: FirebaseAuth, val db: FirebaseFirestore, application: Appl
                 e,
                 "Unable to get feed at the moment.Please try again later.",
             )
-            postFeedProgress.value = false
+            postsFeedProgress.value = false
           }
     } else {
       getGeneralUserFeed()
@@ -439,25 +447,27 @@ constructor(val auth: FirebaseAuth, val db: FirebaseFirestore, application: Appl
   }
 
   fun getGeneralUserFeed() {
-    postFeedProgress.value = true
-
-    // limit to last day not the whole db
-    val currentTime = System.currentTimeMillis()
-    val difference = 24 * 60 * 60 * 1000 // 1 day in milli sec
+    postsFeedProgress.value = true
 
     db.collection(POSTS)
-        .whereGreaterThan("time", currentTime - difference)
+        .orderBy("time", Query.Direction.DESCENDING)
+        .limit(50)
         .get()
-        .addOnSuccessListener {
-          convertPosts(documents = it, _userFeed)
-          postFeedProgress.value = false
+        .addOnSuccessListener { it ->
+          convertPosts(it, postsFeed)
+
+          if (postsFeed.value.isEmpty()) {
+            db.collection(POSTS)
+                .orderBy("time", Query.Direction.DESCENDING)
+                .limit(20)
+                .get()
+                .addOnSuccessListener { convertPosts(it, postsFeed) }
+          }
+          postsFeedProgress.value = false
         }
         .addOnFailureListener { e ->
-          handleException(
-              e,
-              "Unable to get feed at the moment.Please try again later.",
-          )
-          postFeedProgress.value = false
+          handleException(e, "Unable to get feed at the moment. Please try again later.")
+          postsFeedProgress.value = false
         }
   }
 
@@ -474,8 +484,8 @@ constructor(val auth: FirebaseAuth, val db: FirebaseFirestore, application: Appl
 
     // update local state immediately
     val updatedPosts =
-        _userFeed.value.map { if (it.postId == postData.postId) it.copy(likes = newLikes) else it }
-    _userFeed.value = updatedPosts
+        postsFeed.value.map { if (it.postId == postData.postId) it.copy(likes = newLikes) else it }
+    postsFeed.value = updatedPosts
 
     // update firestore
     postData.postId?.let { postId ->
@@ -486,16 +496,17 @@ constructor(val auth: FirebaseAuth, val db: FirebaseFirestore, application: Appl
     }
   }
 
+  // ---------------------------- COMMENTS -------------------------
   fun createComment(postId: String, comment: String) {
-    userData.value?.username?.let { username ->
+    userData.value?.userId?.let { userId ->
       val commentId = UUID.randomUUID().toString()
       val comment =
           CommentsData(
               commentId = commentId,
               postId = postId,
-              username = username,
+              userId = userId,
               comment = comment,
-              time = System.currentTimeMillis(),
+              timeStamp = System.currentTimeMillis(),
           )
 
       db.collection(COMMENTS)
@@ -503,7 +514,7 @@ constructor(val auth: FirebaseAuth, val db: FirebaseFirestore, application: Appl
           .set(comment)
           .addOnSuccessListener {
             // get existing comments
-            getPreviousComments()
+            getComments(postId)
           }
           .addOnFailureListener { e ->
             handleException(e, "Cannot be able to add a comment.Please try again later")
@@ -511,5 +522,64 @@ constructor(val auth: FirebaseAuth, val db: FirebaseFirestore, application: Appl
     }
   }
 
-  fun getPreviousComments() {}
+  fun getComments(postId: String?) {
+    if (postId == null) return
+
+    commentProgress.value = true
+    db.collection(COMMENTS)
+        .whereEqualTo("postId", postId)
+        .get()
+        .addOnSuccessListener { documents ->
+          val newComments = documents.map { it.toObject<CommentsData>() }
+          val sortedComments = newComments.sortedBy { it.timeStamp }
+
+          if (sortedComments.isEmpty()) {
+            commentsMap[postId] = emptyList()
+            commentProgress.value = false
+            return@addOnSuccessListener
+          }
+
+          val resolvedComments = mutableListOf<CommentsData>()
+          var pendingCount = sortedComments.size // track when all fetches are done
+
+          sortedComments.forEach { comment ->
+            db.collection(USERS)
+                .whereEqualTo("userId", comment.userId) // match userId in USERS
+                .get()
+                .addOnSuccessListener { userDocs ->
+                  val user = userDocs.documents.firstOrNull()
+                  val resolvedComment =
+                      comment.copy(
+                          userName = user?.getString("username") ?: "Unknown",
+                          userImage = user?.getString("imageUrl") ?: "",
+                      )
+                  resolvedComments.add(resolvedComment)
+                  pendingCount--
+
+                  // Only update state when ALL comments are resolved
+                  if (pendingCount == 0) {
+                    val sorted = resolvedComments.sortedBy { it.timeStamp }
+                    commentsMap[postId] = sorted
+                    comments.value = sorted
+                    commentProgress.value = false
+                  }
+                }
+                .addOnFailureListener {
+                  // Still add the comment even if user fetch fails
+                  resolvedComments.add(comment)
+                  pendingCount--
+                  if (pendingCount == 0) {
+                    val sorted = resolvedComments.sortedBy { it.timeStamp }
+                    commentsMap[postId] = sorted
+                    comments.value = sorted
+                    commentProgress.value = false
+                  }
+                }
+          }
+        }
+        .addOnFailureListener { e ->
+          handleException(e, "Unable to fetch comments. Please try again later.")
+          commentProgress.value = false
+        }
+  }
 }

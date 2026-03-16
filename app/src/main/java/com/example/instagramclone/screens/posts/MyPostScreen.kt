@@ -73,6 +73,7 @@ fun MyPostScreen(navController: NavController, vm: AuthViewModel) {
   val isPostLoading = vm.refreshPostProgress.value
   val posts = vm.posts.value
   val following = userData?.following?.size ?: 0
+  val followers = vm.followers.value
   val noOfPost = posts.size
 
   Column(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
@@ -86,7 +87,7 @@ fun MyPostScreen(navController: NavController, vm: AuthViewModel) {
             textAlign = TextAlign.Center,
         )
         Text(
-            "100 \nfollowers",
+            "$followers \nfollowers",
             modifier = Modifier.weight(1f).align(Alignment.CenterVertically),
             textAlign = TextAlign.Center,
         )

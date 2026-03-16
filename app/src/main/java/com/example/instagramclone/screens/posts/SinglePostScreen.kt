@@ -2,6 +2,7 @@ package com.example.instagramclone.screens.posts
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -18,6 +19,7 @@ import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.Button
@@ -42,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.example.instagramclone.data.PostData
+import com.example.instagramclone.routes.DestinationScreen
 import com.example.instagramclone.sharedUtils.Divider
 import com.example.instagramclone.sharedUtils.GeneralPostImage
 import com.example.instagramclone.sharedUtils.LikeAnimation
@@ -50,6 +53,11 @@ import kotlinx.coroutines.delay
 
 @Composable
 fun SinglePostScreen(navController: NavController, vm: AuthViewModel, post: PostData) {
+  val comments = vm.comments.value
+
+  // LaunchedEffect is for calling a single call
+  LaunchedEffect(key1 = Unit) { vm.getComments(post.postId) }
+
   post.userId?.let {
     Column(
         modifier =
@@ -61,13 +69,18 @@ fun SinglePostScreen(navController: NavController, vm: AuthViewModel, post: Post
     ) {
       Text("Back", modifier = Modifier.clickable { navController.popBackStack() })
       Divider()
-      SinglePostDisplay(navController, vm, post)
+      SinglePostDisplay(navController, vm, post, noOfComments = comments.size)
     }
   }
 }
 
 @Composable
-fun SinglePostDisplay(navController: NavController, vm: AuthViewModel, post: PostData) {
+fun SinglePostDisplay(
+    navController: NavController,
+    vm: AuthViewModel,
+    post: PostData,
+    noOfComments: Int,
+) {
   val userData = vm.userData.value
   val currentUserId = userData?.userId
   val isLiked = post.likes?.contains(currentUserId) == true
@@ -153,7 +166,11 @@ fun SinglePostDisplay(navController: NavController, vm: AuthViewModel, post: Pos
       LikeAnimation(false)
     }
   }
-  Row(modifier = Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
+  Row(
+      modifier = Modifier.fillMaxWidth().padding(8.dp),
+      verticalAlignment = Alignment.CenterVertically,
+      horizontalArrangement = Arrangement.SpaceBetween,
+  ) {
     IconButton(
         onClick = {
           //          if (isLiked) {
@@ -171,13 +188,33 @@ fun SinglePostDisplay(navController: NavController, vm: AuthViewModel, post: Pos
           tint = if (isLiked) Color.Red else Color.Black,
       )
     }
-    Text(" $likesCount likes", modifier = Modifier.padding(start = 0.dp))
+    Text(
+        " $likesCount likes",
+        modifier =
+            Modifier.padding(
+                start = 0.dp,
+            ),
+    )
+    Spacer(modifier = Modifier.weight(1f))
+    Icon(
+        imageVector = Icons.Outlined.ChatBubbleOutline,
+        contentDescription = "Comments",
+        tint = Color.Black,
+    )
+    Text(" $noOfComments comments", modifier = Modifier.padding(start = 8.dp))
   }
   Row(modifier = Modifier.padding(8.dp)) {
     Text(post.userName ?: "", fontWeight = FontWeight.Bold)
     Text(post.postDescription ?: "", modifier = Modifier.padding(start = 8.dp))
   }
   Row(modifier = Modifier.padding(8.dp)) {
-    Text("10 Comments", color = Color.Gray, modifier = Modifier.padding(8.dp))
+    Text(
+        "$noOfComments Comments",
+        color = Color.Gray,
+        modifier =
+            Modifier.padding(8.dp).clickable {
+              post.postId?.let { navController.navigate(DestinationScreen.Comment.createRoute(it)) }
+            },
+    )
   }
 }

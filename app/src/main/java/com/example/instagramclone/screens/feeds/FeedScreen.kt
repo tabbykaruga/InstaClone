@@ -4,6 +4,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -18,6 +19,7 @@ import androidx.compose.foundation.shape.CornerSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
@@ -58,12 +60,11 @@ fun FeedScreen(
   // userdata loading at the beginning
   val userDataLoading = vm.inProgress.value
   val userData = vm.userData.value
-  val userFeed = vm.userFeed.value
-  val userFeedLoading = vm.postFeedProgress.value
+  val userFeed = vm.postsFeed.value
+  val userFeedLoading = vm.postsFeedProgress.value
 
   Scaffold(bottomBar = { BottomNavigationMenu(BottomNavItem.FEED, navController) }) { padding ->
     Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-      //      Row(modifier = Modifier.fillMaxSize().wrapContentHeight().background(Color.White)) {
       ProfileImageCard(
           userImg = userData?.imageUrl,
           modifier = Modifier.padding(8.dp).size(100.dp),
@@ -76,7 +77,6 @@ fun FeedScreen(
           vm = vm,
           currentUserId = userData?.userId ?: "",
       )
-      //      }
     }
   }
 }
@@ -118,7 +118,9 @@ fun SingleFeedPost(
   val showDislikeAnimation = remember { mutableStateOf(false) }
   val isLiked = post.likes?.contains(currentUserId) == true
   val likesCount = post.likes?.size ?: 0
-  //    val commentsCount = post.comments?.size ?:0
+  val comments = vm.commentsMap[post.postId] ?: emptyList()
+
+  LaunchedEffect(post.postId) { vm.getComments(post.postId) }
 
   Card(
       shape = RoundedCornerShape(corner = CornerSize(4.dp)),
@@ -190,7 +192,13 @@ fun SingleFeedPost(
         }
         Text("$likesCount likes", modifier = Modifier.padding(start = 8.dp))
 
-        //        Text("$commentsCount likes", modifier = Modifier.padding(start = 8.dp))
+        Spacer(modifier = Modifier.weight(1f))
+        Icon(
+            imageVector = Icons.Outlined.ChatBubbleOutline,
+            contentDescription = "Comments",
+            tint = Color.Black,
+        )
+        Text(" ${comments.size} comments", modifier = Modifier.padding(start = 8.dp))
       }
     }
   }

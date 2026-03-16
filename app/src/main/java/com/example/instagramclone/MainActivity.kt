@@ -20,6 +20,7 @@ import com.example.instagramclone.routes.DestinationScreen
 import com.example.instagramclone.screens.auth.LoginScreen
 import com.example.instagramclone.screens.auth.SignUpScreen
 import com.example.instagramclone.screens.feeds.FeedScreen
+import com.example.instagramclone.screens.posts.CommentsScreen
 import com.example.instagramclone.screens.posts.MyPostScreen
 import com.example.instagramclone.screens.posts.NewPostScreen
 import com.example.instagramclone.screens.posts.SinglePostScreen
@@ -82,9 +83,9 @@ fun InstagramApp(
           navController.previousBackStackEntry?.arguments?.getParcelable<PostData>("post")
       postData?.let { SinglePostScreen(navController = navController, vm = vm, post = postData) }
     }
-    composable(DestinationScreen.Comment.route) {
-      //      val postId = navBa
-      //      CommentsScreen(navController = navController, vm = vm, postId = postId)
+    composable(DestinationScreen.Comment.route) { navBackStackEntry ->
+      val postId = navBackStackEntry.arguments?.getString("postId")
+      postId?.let { CommentsScreen(navController = navController, vm = vm, postId = postId) }
     }
   }
 }

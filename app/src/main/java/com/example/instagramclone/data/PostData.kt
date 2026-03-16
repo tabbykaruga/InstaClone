@@ -2,18 +2,19 @@ package com.example.instagramclone.data
 
 import android.os.Parcel
 import android.os.Parcelable
+import com.google.firebase.firestore.Exclude
 
 data class PostData(
     val postId: String? = null,
     val userId: String? = null,
-    val userName: String? = null,
-    val userImage: String? = null,
     val postImage: String? = null,
     val postDescription: String? = null,
     val postLocation: String? = null,
     val time: Long? = null,
     var likes: List<String>? = null,
     val searchTerms: List<String>? = null,
+    @Exclude val userName: String = "", // resolved at runtime
+    @Exclude val userImage: String = "", // resolved at runtime
 ) : Parcelable {
   constructor(
       parcel: Parcel
@@ -23,18 +24,14 @@ data class PostData(
       parcel.readString(),
       parcel.readString(),
       parcel.readString(),
-      parcel.readString(),
-      parcel.readString(),
       parcel.readValue(Long::class.java.classLoader) as Long,
       parcel.createStringArrayList(),
       parcel.createStringArrayList(),
-  ) {}
+  )
 
   override fun writeToParcel(parcel: Parcel, flags: Int) {
     parcel.writeString(postId)
     parcel.writeString(userId)
-    parcel.writeString(userName)
-    parcel.writeString(userImage)
     parcel.writeString(postImage)
     parcel.writeString(postDescription)
     parcel.writeString(postLocation)
@@ -43,17 +40,11 @@ data class PostData(
     parcel.writeStringList(searchTerms)
   }
 
-  override fun describeContents(): Int {
-    return 0
-  }
+  override fun describeContents() = 0
 
   companion object CREATOR : Parcelable.Creator<PostData> {
-    override fun createFromParcel(parcel: Parcel): PostData {
-      return PostData(parcel)
-    }
+    override fun createFromParcel(parcel: Parcel) = PostData(parcel)
 
-    override fun newArray(size: Int): Array<out PostData?>? {
-      return arrayOfNulls(size)
-    }
+    override fun newArray(size: Int): Array<out PostData?> = arrayOfNulls(size)
   }
 }
