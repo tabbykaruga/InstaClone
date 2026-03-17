@@ -115,7 +115,10 @@ fun SinglePostDisplay(
         Icon(
             imageVector = Icons.Outlined.DeleteOutline,
             contentDescription = "Delete",
-            modifier = Modifier.size(24.dp).clickable {},
+            modifier =
+                Modifier.size(24.dp).clickable {
+                  vm.onDeletePost(post, onSuccess = { navController.popBackStack() })
+                },
         )
       } else {
 
@@ -173,11 +176,11 @@ fun SinglePostDisplay(
   ) {
     IconButton(
         onClick = {
-          //          if (isLiked) {
-          //            showDislikeAnimation.value = true
-          //          } else {
-          //            showLikeAnimation.value = true
-          //          }
+          if (isLiked) {
+            showDislikeAnimation.value = true
+          } else {
+            showLikeAnimation.value = true
+          }
           vm.onLikePost(post)
         },
         modifier = Modifier.size(24.dp),

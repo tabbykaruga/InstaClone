@@ -1,11 +1,7 @@
 package com.example.instagramclone.viewModel
 
 import android.app.Application
-import android.graphics.Bitmap
-import android.graphics.ImageDecoder
 import android.net.Uri
-import android.os.Build
-import android.provider.MediaStore
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
@@ -25,8 +21,6 @@ import com.google.firebase.firestore.QuerySnapshot
 import com.google.firebase.firestore.SetOptions
 import com.google.firebase.firestore.ktx.toObject
 import dagger.hilt.android.lifecycle.HiltViewModel
-import java.io.File
-import java.io.FileOutputStream
 import java.util.Locale
 import java.util.UUID
 import javax.inject.Inject
@@ -72,7 +66,7 @@ constructor(val auth: FirebaseAuth, val db: FirebaseFirestore, application: Appl
   }
 
   fun onSignUp(username: String, email: String, password: String) {
-    if (username.isEmpty() or email.isEmpty() or password.isEmpty()) {
+    if (username.isEmpty() || email.isEmpty() || password.isEmpty()) {
       handleException(customMessage = "Please fill in all fields")
       return
     }
@@ -101,7 +95,10 @@ constructor(val auth: FirebaseAuth, val db: FirebaseFirestore, application: Appl
             }
           }
         }
-        .addOnFailureListener {}
+        .addOnFailureListener { e ->
+          handleException(e, "Failed to check username")
+          inProgress.value = false
+        }
   }
 
   fun onLogin(email: String, password: String) {
@@ -220,58 +217,29 @@ constructor(val auth: FirebaseAuth, val db: FirebaseFirestore, application: Appl
     createOrUpdateProfile(name = name, username = userName, bio = bio)
   }
 
-  fun uploadProfileImageAndSave(name: String, userName: String, bio: String, uri: Uri) {
-    val userId = auth.currentUser?.uid ?: return
+  fun uploadProfileImage(name: String, userName: String, bio: String, uri: Uri) {
     inProgress.value = true
-    val localPath = saveImageLocalStorage(uri, userId)
-    if (localPath != null) {
-      val imageLoader = coil.Coil.imageLoader(getApplication())
-      imageLoader.memoryCache?.clear()
-      createOrUpdateProfile(
-          name = name,
-          username = userName,
-          bio = bio,
-          imageUrl = localPath,
-      )
-      userData.value = userData.value?.copy(imageUrl = localPath)
-    } else {
-      handleException(null, "Failed to save image locally")
-      inProgress.value = false
-    }
-  }
 
-  private fun uriBitmap(uri: Uri): Bitmap {
-    val appContext = getApplication<Application>().applicationContext
-    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-      ImageDecoder.decodeBitmap(ImageDecoder.createSource(appContext.contentResolver, uri))
-    } else {
-      @Suppress("DEPRECATION") MediaStore.Images.Media.getBitmap(appContext.contentResolver, uri)
-    }
-  }
-
-  private fun saveImageLocalStorage(uri: Uri, userId: String): String? {
-    return try {
-      val appContext = getApplication<Application>().applicationContext
-      val bitmap = uriBitmap(uri) // clean, no deprecation warning
-
-      val filename = "profile_$userId.jpg"
-      val file = File(appContext.filesDir, filename)
-
-      if (file.exists()) file.delete()
-
-      FileOutputStream(file).use { stream ->
-        bitmap.compress(Bitmap.CompressFormat.JPEG, 85, stream)
-      }
-
-      file.absolutePath
-    } catch (e: Exception) {
-      handleException(e, "Failed to save image")
-      null
-    }
+    ImageUploader.uploadImage(
+        uri,
+        onSuccess = { imageUrl ->
+          createOrUpdateProfile(
+              name = name,
+              username = userName,
+              bio = bio,
+              imageUrl = imageUrl, // ⭐ Cloudinary URL saved to Firebase
+          )
+          userData.value = userData.value?.copy(imageUrl = imageUrl)
+          inProgress.value = false
+        },
+        onError = {
+          handleException(customMessage = "Image upload failed")
+          inProgress.value = false
+        },
+    )
   }
 
   // ----------------- POST --------------
-
   fun onCreateNewPost(
       imageUri: Uri,
       description: String,
@@ -283,8 +251,6 @@ constructor(val auth: FirebaseAuth, val db: FirebaseFirestore, application: Appl
         imageUri,
         onSuccess = { imageUrl ->
           val currentUid = auth.currentUser?.uid
-          val currentUsername = userData.value?.username
-          val currentUserImage = userData.value?.imageUrl
 
           if (currentUid != null) {
 
@@ -332,6 +298,40 @@ constructor(val auth: FirebaseAuth, val db: FirebaseFirestore, application: Appl
           inProgress.value = false
         },
     )
+  }
+
+  fun onDeletePost(post: PostData, onSuccess: () -> Unit) {
+    val currentUid = auth.currentUser?.uid
+
+    if (currentUid == null || currentUid != post.userId) {
+      handleException(customMessage = "Unauthorized to delete this post")
+      return
+    }
+
+    val postId =
+        post.postId
+            ?: run {
+              handleException(customMessage = "Invalid post")
+              return
+            }
+
+    inProgress.value = true
+
+    db.collection(POSTS)
+        .document(postId)
+        .delete()
+        .addOnSuccessListener {
+          posts.value = posts.value.filter { it.postId != postId }
+          postsFeed.value = postsFeed.value.filter { it.postId != postId }
+
+          popupNotification.value = Event("Post deleted successfully")
+          inProgress.value = false
+          onSuccess.invoke()
+        }
+        .addOnFailureListener { e ->
+          handleException(e, "Unable to delete post")
+          inProgress.value = false
+        }
   }
 
   private fun refreshPost() {
@@ -428,10 +428,9 @@ constructor(val auth: FirebaseAuth, val db: FirebaseFirestore, application: Appl
           .get()
           .addOnSuccessListener {
             convertPosts(documents = it, postsFeed)
-            if (postsFeed.value.isEmpty()) {
-              getGeneralUserFeed()
-            } else {
-              postsFeedProgress.value = false
+            changePostUsernames(postsFeed.value, postsFeed) {
+              if (postsFeed.value.isEmpty()) getGeneralUserFeed()
+              else postsFeedProgress.value = false
             }
           }
           .addOnFailureListener { e ->
@@ -456,19 +455,77 @@ constructor(val auth: FirebaseAuth, val db: FirebaseFirestore, application: Appl
         .addOnSuccessListener { it ->
           convertPosts(it, postsFeed)
 
-          if (postsFeed.value.isEmpty()) {
-            db.collection(POSTS)
-                .orderBy("time", Query.Direction.DESCENDING)
-                .limit(20)
-                .get()
-                .addOnSuccessListener { convertPosts(it, postsFeed) }
+          changePostUsernames(postsFeed.value, postsFeed) {
+            if (postsFeed.value.isEmpty()) {
+              db.collection(POSTS)
+                  .orderBy("time", Query.Direction.DESCENDING)
+                  .limit(20)
+                  .get()
+                  .addOnSuccessListener { docs ->
+                    convertPosts(docs, postsFeed)
+                    changePostUsernames(postsFeed.value, postsFeed) {
+                      postsFeedProgress.value = false
+                    }
+                  }
+            } else {
+              postsFeedProgress.value = false
+            }
           }
-          postsFeedProgress.value = false
         }
         .addOnFailureListener { e ->
           handleException(e, "Unable to get feed at the moment. Please try again later.")
           postsFeedProgress.value = false
         }
+  }
+
+  private fun changePostUsernames(
+      posts: List<PostData>,
+      outState: MutableState<List<PostData>>,
+      onComplete: (() -> Unit)? = null,
+  ) {
+    val distinctUserIds = posts.mapNotNull { it.userId }.distinct()
+    var completed = 0
+
+    data class UserInfo(val username: String, val userImage: String)
+    val userInfoMap = mutableMapOf<String, UserInfo>()
+
+    if (distinctUserIds.isEmpty()) {
+      onComplete?.invoke()
+      return
+    }
+
+    distinctUserIds.forEach { userId ->
+      db.collection(USERS)
+          .document(userId)
+          .get()
+          .addOnSuccessListener { doc ->
+            userInfoMap[userId] =
+                UserInfo(
+                    username = doc.getString("username") ?: "",
+                    userImage = doc.getString("imageUrl") ?: "",
+                )
+            completed++
+
+            if (completed == distinctUserIds.size) {
+              outState.value =
+                  posts.map { post ->
+                    val info = userInfoMap[post.userId]
+                    post.copy(
+                        userName = info?.username ?: "",
+                        userImage = info?.userImage ?: "",
+                    )
+                  }
+              onComplete?.invoke()
+            }
+          }
+          .addOnFailureListener {
+            completed++
+            if (completed == distinctUserIds.size) {
+              outState.value = posts
+              onComplete?.invoke()
+            }
+          }
+    }
   }
 
   fun onLikePost(postData: PostData) {

@@ -73,7 +73,7 @@ fun ProfileScreen(navController: NavController, vm: AuthViewModel) {
         onImageSelected = { uri: Uri -> selectedImageUri = uri },
         onSave = {
           if (selectedImageUri != null) {
-            vm.uploadProfileImageAndSave(
+            vm.uploadProfileImage(
                 uri = selectedImageUri!!,
                 name = name,
                 userName = userName,

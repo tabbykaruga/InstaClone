@@ -13,8 +13,8 @@ data class PostData(
     val time: Long? = null,
     var likes: List<String>? = null,
     val searchTerms: List<String>? = null,
-    @Exclude val userName: String = "", // resolved at runtime
-    @Exclude val userImage: String = "", // resolved at runtime
+    @Exclude val userName: String = "",
+    @Exclude val userImage: String = "",
 ) : Parcelable {
   constructor(
       parcel: Parcel
