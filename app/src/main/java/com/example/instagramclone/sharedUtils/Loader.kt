@@ -154,7 +154,7 @@ fun FeedScreenShimmer() {
 @Composable
 fun MyPostGridShimmer() {
   LazyColumn {
-    items(4) { // 4 shimmer rows
+    items(10) { // 4 shimmer rows
       Row(modifier = Modifier.fillMaxWidth().height(120.dp)) {
         repeat(3) { // 3 columns per row
           ShimmerEffect(modifier = Modifier.weight(1f).fillMaxHeight().padding(1.dp))

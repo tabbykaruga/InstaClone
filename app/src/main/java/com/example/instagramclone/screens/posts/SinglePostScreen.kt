@@ -111,8 +111,9 @@ fun SinglePostDisplay(
 ) {
   val userData = vm.userData.value
   val currentUserId = userData?.userId
-  val isLiked = post.likes?.contains(currentUserId) == true
-  val likesCount = post.likes?.size ?: 0
+  val currentPost = vm.postsFeed.value.find { it.postId == post.postId } ?: post
+  val isLiked = currentPost.likes?.contains(currentUserId) == true
+  val likesCount = currentPost.likes?.size ?: 0
   val showLikeAnimation = remember { mutableStateOf(false) }
   val showDislikeAnimation = remember { mutableStateOf(false) }
 
@@ -164,19 +165,19 @@ fun SinglePostDisplay(
       }
     }
   }
-  Box {
+  Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
     GeneralPostImage(
-        data = post.postImage,
+        data = currentPost.postImage,
         modifier =
-            Modifier.fillMaxWidth().defaultMinSize(minHeight = 150.dp).pointerInput(Unit) {
+            Modifier.fillMaxWidth().defaultMinSize(minHeight = 130.dp).pointerInput(Unit) {
               detectTapGestures(
                   onDoubleTap = {
-                    if (post.likes?.contains(currentUserId) == true) {
+                    if (currentPost.likes?.contains(currentUserId) == true) {
                       showDislikeAnimation.value = true
                     } else {
                       showLikeAnimation.value = true
                     }
-                    vm.onLikePost(post)
+                    vm.onLikePost(currentPost)
                   },
               )
             },
@@ -202,14 +203,7 @@ fun SinglePostDisplay(
       verticalAlignment = Alignment.CenterVertically,
   ) {
     IconButton(
-        onClick = {
-          if (isLiked) {
-            showDislikeAnimation.value = true
-          } else {
-            showLikeAnimation.value = true
-          }
-          vm.onLikePost(post)
-        },
+        onClick = { vm.onLikePost(currentPost) },
     ) {
       Row(verticalAlignment = Alignment.CenterVertically) {
         Icon(

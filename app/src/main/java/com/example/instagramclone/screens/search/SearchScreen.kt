@@ -1,11 +1,18 @@
 package com.example.instagramclone.screens.search
 
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -14,6 +21,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
@@ -21,18 +29,22 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import com.example.instagramclone.data.PostData
 import com.example.instagramclone.routes.DestinationScreen
 import com.example.instagramclone.screens.BottomNavItem
 import com.example.instagramclone.screens.BottomNavigationMenu
 import com.example.instagramclone.screens.posts.PostLists
-import com.example.instagramclone.sharedUtils.MySearchScreenShimmer
+import com.example.instagramclone.sharedUtils.GeneralPostImage
+import com.example.instagramclone.sharedUtils.MyPostGridShimmer
 import com.example.instagramclone.sharedUtils.NavParam
 import com.example.instagramclone.sharedUtils.navigateTo
 import com.example.instagramclone.viewModel.AuthViewModel
@@ -43,25 +55,44 @@ fun SearchScreen(navController: NavController, vm: AuthViewModel) {
   val searchedPostLoading = vm.searchedPostProgress.value
   val searchedPosts = vm.searchedPosts.value
   var searchTerm by rememberSaveable() { mutableStateOf("") }
+  val randomPosts = vm.randomPosts.value
+  val randomPostsLoading = vm.randomPostsProgress.value
+  val isSearching = searchTerm.isNotEmpty()
 
   Scaffold(bottomBar = { BottomNavigationMenu(BottomNavItem.SEARCH, navController) }) { padding ->
     Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-      if (searchedPostLoading) {
-        MySearchScreenShimmer()
+      // Search bar — always visible
+      SearchBar(
+          searchTerm = searchTerm,
+          onSearchChange = {
+            searchTerm = it
+            if (it.isEmpty()) vm.searchedPosts.value = emptyList() // clear results when cleared
+          },
+          onSearch = { vm.searchPost(searchTerm) },
+      )
+
+      if (isSearching) {
+        // Show search results using existing PostLists grid
+        PostLists(
+            isContextLoading = false,
+            postLoading = searchedPostLoading,
+            posts = searchedPosts,
+            modifier = Modifier.fillMaxSize().padding(8.dp).imePadding(),
+        ) { post ->
+          navigateTo(navController, DestinationScreen.SinglePost, NavParam("post", post))
+        }
       } else {
-        SearchBar(
-            searchTerm,
-            onSearchChange = { searchTerm = it },
-            onSearch = { vm.searchPost(searchTerm) },
-        )
-      }
-      PostLists(
-          isContextLoading = false,
-          postLoading = searchedPostLoading,
-          posts = searchedPosts,
-          modifier = Modifier.fillMaxSize().padding(8.dp).imePadding(),
-      ) { post ->
-        navigateTo(navController, DestinationScreen.SinglePost, NavParam("post", post))
+        // Show random posts grid
+        if (randomPostsLoading) {
+          MyPostGridShimmer()
+        } else {
+          RandomPostsGrid(
+              posts = randomPosts,
+              onPostClick = { post ->
+                navigateTo(navController, DestinationScreen.SinglePost, NavParam("post", post))
+              },
+          )
+        }
       }
     }
   }
@@ -115,4 +146,38 @@ fun SearchBar(
         }
       },
   )
+}
+
+@Composable
+fun RandomPostsGrid(
+    posts: List<PostData>,
+    onPostClick: (PostData) -> Unit,
+) {
+  if (posts.isEmpty()) {
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+      Text("No posts available", color = Color.Gray)
+    }
+    return
+  }
+
+  LazyVerticalGrid(
+      columns = GridCells.Fixed(3),
+      modifier = Modifier.fillMaxSize().padding(1.dp),
+      horizontalArrangement = Arrangement.spacedBy(2.dp),
+      verticalArrangement = Arrangement.spacedBy(2.dp),
+  ) {
+    items(items = posts, key = { it.postId ?: "" }) { post ->
+      Box(
+          modifier =
+              Modifier.aspectRatio(1f) // keeps cells square
+                  .clickable { onPostClick(post) }
+      ) {
+        GeneralPostImage(
+            data = post.postImage,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop,
+        )
+      }
+    }
+  }
 }

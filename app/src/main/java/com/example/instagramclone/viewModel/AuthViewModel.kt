@@ -18,7 +18,6 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.QuerySnapshot
-import com.google.firebase.firestore.SetOptions
 import com.google.firebase.firestore.ktx.toObject
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.util.Locale
@@ -50,6 +49,8 @@ constructor(val auth: FirebaseAuth, val db: FirebaseFirestore, application: Appl
   // SEARCH
   val searchedPosts = mutableStateOf<List<PostData>>(listOf())
   val searchedPostProgress = mutableStateOf(false)
+  var randomPosts = mutableStateOf<List<PostData>>(emptyList())
+  var randomPostsProgress = mutableStateOf(false)
 
   // FEED
   val postsFeed = mutableStateOf<List<PostData>>(listOf())
@@ -255,12 +256,19 @@ constructor(val auth: FirebaseAuth, val db: FirebaseFirestore, application: Appl
           if (currentUid != null) {
 
             val postUuid = UUID.randomUUID().toString()
+            val username = userData.value?.username?.lowercase() ?: ""
+            val name = userData.value?.name?.lowercase() ?: ""
 
             val searchTerms =
                 description
                     .split(" ", ".", ",", "?", "!", "#")
                     .map { it.lowercase() }
                     .filter { it.isNotEmpty() and !fillerWords.contains(it) }
+                    .toMutableList()
+                    .apply {
+                      if (username.isNotEmpty()) add(username)
+                      if (name.isNotEmpty()) addAll(name.split(" "))
+                    }
 
             val post =
                 PostData(
@@ -354,6 +362,27 @@ constructor(val auth: FirebaseAuth, val db: FirebaseFirestore, application: Appl
       handleException(customMessage = "Error :Username unavailable.Unable to create a new post")
       onLogOut()
     }
+  }
+
+  fun getRandomPosts() {
+    randomPostsProgress.value = true
+    val currentUserId = auth.currentUser?.uid
+
+    db.collection(POSTS)
+        .get()
+        .addOnSuccessListener { documents ->
+          val allPosts = documents.toObjects(PostData::class.java)
+          randomPosts.value =
+              allPosts
+                  .filter { it.userId != currentUserId } // exclude current user's posts
+                  .shuffled() // randomize order
+                  .take(20) // limit to 20 posts
+          randomPostsProgress.value = false
+        }
+        .addOnFailureListener { e ->
+          handleException(e, "Unable to fetch posts")
+          randomPostsProgress.value = false
+        }
   }
 
   // Build posts on top of each other
@@ -530,7 +559,10 @@ constructor(val auth: FirebaseAuth, val db: FirebaseFirestore, application: Appl
 
   fun onLikePost(postData: PostData) {
     val userId = auth.currentUser?.uid ?: return
-    val currentLikes = postData.likes?.toMutableList() ?: mutableListOf()
+
+    // Get the most current version of the post from the feed
+    val currentPost = postsFeed.value.find { it.postId == postData.postId } ?: postData
+    val currentLikes = currentPost.likes?.toMutableList() ?: mutableListOf()
 
     val newLikes =
         if (currentLikes.contains(userId)) {
@@ -539,16 +571,15 @@ constructor(val auth: FirebaseAuth, val db: FirebaseFirestore, application: Appl
           currentLikes.apply { add(userId) } // like
         }
 
-    // update local state immediately
-    val updatedPosts =
+    // Update local state immediately
+    postsFeed.value =
         postsFeed.value.map { if (it.postId == postData.postId) it.copy(likes = newLikes) else it }
-    postsFeed.value = updatedPosts
 
-    // update firestore
+    // Update Firestore
     postData.postId?.let { postId ->
       db.collection(POSTS)
           .document(postId)
-          .set(mapOf("likes" to newLikes), SetOptions.merge())
+          .update("likes", newLikes) // ← use update() instead of set() with merge
           .addOnFailureListener { e -> handleException(e, "Unable to like post") }
     }
   }
