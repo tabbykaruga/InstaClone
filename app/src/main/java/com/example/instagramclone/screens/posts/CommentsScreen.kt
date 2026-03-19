@@ -31,9 +31,8 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
-import com.example.instagramclone.sharedUtils.CommonProgressSpinner
+import com.example.instagramclone.sharedUtils.CommentsShimmer
 import com.example.instagramclone.viewModel.AuthViewModel
-import kotlin.collections.get
 
 @Composable
 fun CommentsScreen(vm: AuthViewModel, postId: String) {
@@ -56,8 +55,10 @@ fun CommentsScreen(vm: AuthViewModel, postId: String) {
     Column(modifier = Modifier.weight(1f)) {
       when {
         commentsProgress -> {
-          Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-            CommonProgressSpinner()
+          Column {
+            repeat(5) { // ← shows 5 shimmer rows
+              CommentsShimmer()
+            }
           }
         }
         comments.isEmpty() -> {

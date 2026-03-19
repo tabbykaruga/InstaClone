@@ -51,7 +51,7 @@ import com.example.instagramclone.routes.DestinationScreen
 import com.example.instagramclone.screens.BottomNavItem
 import com.example.instagramclone.screens.BottomNavigationMenu
 import com.example.instagramclone.screens.posts.CommentsScreen
-import com.example.instagramclone.sharedUtils.CommonProgressSpinner
+import com.example.instagramclone.sharedUtils.FeedScreenShimmer
 import com.example.instagramclone.sharedUtils.GeneralPostImage
 import com.example.instagramclone.sharedUtils.LikeAnimation
 import com.example.instagramclone.sharedUtils.NavParam
@@ -100,18 +100,23 @@ fun FeedPostList(
 ) {
   Box(modifier = modifier) {
     LazyColumn {
-      items(items = posts) {
-        SingleFeedPost(
-            post = it,
-            currentUserId = currentUserId,
-            vm = vm,
-            onPostClick = {
-              navigateTo(navController, DestinationScreen.SinglePost, NavParam("post", it))
-            },
-        )
+      if (loading) {
+        items(3) { // ← 3 shimmer cards while loading
+          FeedScreenShimmer()
+        }
+      } else {
+        items(items = posts) {
+          SingleFeedPost(
+              post = it,
+              currentUserId = currentUserId,
+              vm = vm,
+              onPostClick = {
+                navigateTo(navController, DestinationScreen.SinglePost, NavParam("post", it))
+              },
+          )
+        }
       }
     }
-    if (loading) CommonProgressSpinner()
   }
 }
 

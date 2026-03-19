@@ -33,8 +33,9 @@ import com.example.instagramclone.routes.DestinationScreen
 import com.example.instagramclone.screens.BottomNavItem
 import com.example.instagramclone.screens.BottomNavigationMenu
 import com.example.instagramclone.screens.profile.ProfileImage
-import com.example.instagramclone.sharedUtils.CommonProgressSpinner
 import com.example.instagramclone.sharedUtils.GeneralPostImage
+import com.example.instagramclone.sharedUtils.MyPostGridShimmer
+import com.example.instagramclone.sharedUtils.MyPostScreenShimmer
 import com.example.instagramclone.sharedUtils.NavParam
 import com.example.instagramclone.sharedUtils.navigateTo
 import com.example.instagramclone.viewModel.AuthViewModel
@@ -133,7 +134,7 @@ fun MyPostScreen(navController: NavController, vm: AuthViewModel) {
     BottomNavigationMenu(BottomNavItem.POSTS, navController)
   }
 
-  if (isLoading) CommonProgressSpinner()
+  if (isLoading) MyPostScreenShimmer()
 }
 
 @Composable
@@ -145,7 +146,7 @@ fun PostLists(
     onPostClick: (PostData) -> Unit,
 ) {
   if (postLoading) {
-    CommonProgressSpinner()
+    MyPostGridShimmer()
   } else if (posts.isEmpty()) {
     Column(
         modifier = modifier,

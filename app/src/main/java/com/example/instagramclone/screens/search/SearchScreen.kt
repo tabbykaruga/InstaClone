@@ -32,6 +32,7 @@ import com.example.instagramclone.routes.DestinationScreen
 import com.example.instagramclone.screens.BottomNavItem
 import com.example.instagramclone.screens.BottomNavigationMenu
 import com.example.instagramclone.screens.posts.PostLists
+import com.example.instagramclone.sharedUtils.MySearchScreenShimmer
 import com.example.instagramclone.sharedUtils.NavParam
 import com.example.instagramclone.sharedUtils.navigateTo
 import com.example.instagramclone.viewModel.AuthViewModel
@@ -45,12 +46,15 @@ fun SearchScreen(navController: NavController, vm: AuthViewModel) {
 
   Scaffold(bottomBar = { BottomNavigationMenu(BottomNavItem.SEARCH, navController) }) { padding ->
     Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-      SearchBar(
-          searchTerm,
-          onSearchChange = { searchTerm = it },
-          onSearch = { vm.searchPost(searchTerm) },
-      )
-
+      if (searchedPostLoading) {
+        MySearchScreenShimmer()
+      } else {
+        SearchBar(
+            searchTerm,
+            onSearchChange = { searchTerm = it },
+            onSearch = { vm.searchPost(searchTerm) },
+        )
+      }
       PostLists(
           isContextLoading = false,
           postLoading = searchedPostLoading,

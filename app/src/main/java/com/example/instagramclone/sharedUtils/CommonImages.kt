@@ -57,9 +57,7 @@ fun CommonImage(
     ) {
       when (painter.state) {
         is AsyncImagePainter.State.Loading -> {
-          Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CommonProgressSpinner()
-          }
+          ShimmerEffect(modifier = Modifier.fillMaxSize())
         }
 
         is AsyncImagePainter.State.Error -> {
@@ -102,9 +100,7 @@ fun GeneralPostImage(
   ) {
     when (painter.state) {
       is AsyncImagePainter.State.Loading -> {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-          CommonProgressSpinner()
-        }
+        ShimmerEffect(modifier = Modifier.fillMaxSize())
       }
 
       is AsyncImagePainter.State.Error -> {
