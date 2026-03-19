@@ -5,7 +5,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -22,15 +24,20 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.Card
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -43,6 +50,7 @@ import com.example.instagramclone.data.PostData
 import com.example.instagramclone.routes.DestinationScreen
 import com.example.instagramclone.screens.BottomNavItem
 import com.example.instagramclone.screens.BottomNavigationMenu
+import com.example.instagramclone.screens.posts.CommentsScreen
 import com.example.instagramclone.sharedUtils.CommonProgressSpinner
 import com.example.instagramclone.sharedUtils.GeneralPostImage
 import com.example.instagramclone.sharedUtils.LikeAnimation
@@ -107,6 +115,7 @@ fun FeedPostList(
   }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SingleFeedPost(
     post: PostData,
@@ -119,6 +128,8 @@ fun SingleFeedPost(
   val isLiked = post.likes?.contains(currentUserId) == true
   val likesCount = post.likes?.size ?: 0
   val comments = vm.commentsMap[post.postId] ?: emptyList()
+  val sheetState = rememberModalBottomSheetState()
+  var showCommentsSheet by remember { mutableStateOf(false) }
 
   LaunchedEffect(post.postId) { vm.getComments(post.postId) }
 
@@ -193,12 +204,29 @@ fun SingleFeedPost(
         Text("$likesCount likes", modifier = Modifier.padding(start = 8.dp))
 
         Spacer(modifier = Modifier.weight(1f))
-        Icon(
-            imageVector = Icons.Outlined.ChatBubbleOutline,
-            contentDescription = "Comments",
-            tint = Color.Black,
+        IconButton(onClick = { showCommentsSheet = true }, modifier = Modifier.size(24.dp)) {
+          Icon(
+              imageVector = Icons.Outlined.ChatBubbleOutline,
+              contentDescription = "Comments",
+              tint = Color.Black,
+          )
+        }
+        Text(
+            "${comments.size} comment",
+            modifier = Modifier.padding(start = 4.dp),
         )
-        Text(" ${comments.size} comments", modifier = Modifier.padding(start = 8.dp))
+      }
+    }
+    if (showCommentsSheet) {
+      ModalBottomSheet(
+          onDismissRequest = { showCommentsSheet = false },
+          sheetState = sheetState,
+          containerColor = Color.White,
+          modifier = Modifier.fillMaxHeight(0.635f),
+          dragHandle = null,
+          contentWindowInsets = { WindowInsets(0, 0, 0, 0) },
+      ) {
+        CommentsScreen(vm = vm, postId = post.postId ?: "")
       }
     }
   }

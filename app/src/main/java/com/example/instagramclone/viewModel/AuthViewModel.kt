@@ -227,7 +227,7 @@ constructor(val auth: FirebaseAuth, val db: FirebaseFirestore, application: Appl
               name = name,
               username = userName,
               bio = bio,
-              imageUrl = imageUrl, // ⭐ Cloudinary URL saved to Firebase
+              imageUrl = imageUrl,
           )
           userData.value = userData.value?.copy(imageUrl = imageUrl)
           inProgress.value = false

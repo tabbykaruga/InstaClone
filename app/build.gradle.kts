@@ -55,6 +55,7 @@ dependencies {
   implementation("io.coil-kt:coil-compose:2.6.0")
   implementation("androidx.compose.material:material-icons-extended:<version>")
   implementation("com.cloudinary:cloudinary-android:2.3.1")
+  implementation("androidx.compose.material3:material3:1.3.1")
   implementation(libs.androidx.core.ktx)
   implementation(libs.androidx.lifecycle.runtime.ktx)
   implementation(libs.androidx.activity.compose)
