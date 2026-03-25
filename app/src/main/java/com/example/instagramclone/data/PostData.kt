@@ -2,7 +2,6 @@ package com.example.instagramclone.data
 
 import android.os.Parcel
 import android.os.Parcelable
-import com.google.firebase.firestore.Exclude
 
 data class PostData(
     val postId: String? = null,
@@ -13,8 +12,6 @@ data class PostData(
     val time: Long? = null,
     var likes: List<String>? = null,
     val searchTerms: List<String>? = null,
-    @Exclude val userName: String = "",
-    @Exclude val userImage: String = "",
 ) : Parcelable {
   constructor(
       parcel: Parcel

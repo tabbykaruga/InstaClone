@@ -16,7 +16,10 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -24,9 +27,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.instagramclone.data.PostData
 import com.example.instagramclone.routes.DestinationScreen
@@ -78,63 +85,93 @@ fun MyPostScreen(navController: NavController, vm: AuthViewModel) {
   val noOfPost = posts.size
 
   Column(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
-    Column(modifier = Modifier.weight(1f).padding(top = 20.dp)) {
-      Row(modifier = Modifier.padding()) {
-        ProfileImage(userData?.imageUrl) { navigateTo(navController, DestinationScreen.Profile) }
+    if (isLoading) {
+      MyPostScreenShimmer()
+    } else {
+      Column(modifier = Modifier.height(350.dp).padding(top = 20.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End,
+        ) {
+          Icon(
+              imageVector = Icons.AutoMirrored.Filled.Logout,
+              contentDescription = "Log Out",
+              modifier =
+                  Modifier.padding(end = 12.dp).clickable {
+                    vm.onLogOut()
+                    navigateTo(navController, DestinationScreen.Login)
+                  },
+          )
+        }
+        Row(modifier = Modifier.padding()) {
+          ProfileImage(userData?.imageUrl) { navigateTo(navController, DestinationScreen.Profile) }
 
-        Text(
-            "$noOfPost \nposts",
-            modifier = Modifier.weight(1f).align(Alignment.CenterVertically),
-            textAlign = TextAlign.Center,
-        )
-        Text(
-            "$followers \nfollowers",
-            modifier = Modifier.weight(1f).align(Alignment.CenterVertically),
-            textAlign = TextAlign.Center,
-        )
-        Text(
-            "$following \nfollowing",
-            modifier = Modifier.weight(1f).align(Alignment.CenterVertically),
-            textAlign = TextAlign.Center,
-        )
+          Text(
+              "$noOfPost \nposts",
+              modifier = Modifier.weight(1f).align(Alignment.CenterVertically),
+              textAlign = TextAlign.Center,
+          )
+          Text(
+              "$followers \nfollowers",
+              modifier = Modifier.weight(1f).align(Alignment.CenterVertically),
+              textAlign = TextAlign.Center,
+          )
+          Text(
+              "$following \nfollowing",
+              modifier = Modifier.weight(1f).align(Alignment.CenterVertically),
+              textAlign = TextAlign.Center,
+          )
+        }
+        Column(modifier = Modifier.padding(horizontal = 18.dp, vertical = 4.dp)) {
+          val userNameDisplay = if (userData?.username == null) "" else "@ ${userData.username},"
+          Text(
+              userData?.name ?: "",
+              fontWeight = FontWeight.Bold,
+              fontSize = 18.sp,
+          )
+          Text(
+              userNameDisplay,
+              fontFamily = FontFamily.Cursive,
+              fontSize = 16.sp,
+          )
+          Text(
+              userData?.bio ?: "",
+              maxLines = 2,
+              overflow = TextOverflow.Ellipsis,
+              fontSize = 14.sp,
+              fontStyle = FontStyle.Italic,
+          )
+        }
+        OutlinedButton(
+            onClick = { newPostImageLauncher.launch("image/*") },
+            modifier = Modifier.padding(18.dp).fillMaxWidth(),
+            colors = ButtonDefaults.buttonColors(Color.Transparent),
+            elevation =
+                ButtonDefaults.buttonElevation(
+                    defaultElevation = 0.dp,
+                    pressedElevation = 0.dp,
+                    disabledElevation = 0.dp,
+                ),
+            shape = RoundedCornerShape(10),
+        ) {
+          Text("Upload Post", color = Color.Black)
+        }
       }
-      Column(modifier = Modifier.padding(18.dp)) {
-        val userNameDisplay = if (userData?.username == null) "" else "@${userData.username}"
-        Text(userData?.name ?: "", fontWeight = FontWeight.Bold)
-        Text(userNameDisplay)
-        Text(userData?.bio ?: "")
-      }
-      OutlinedButton(
-          onClick = { newPostImageLauncher.launch("image/*") },
-          modifier = Modifier.padding(18.dp).fillMaxWidth(),
-          colors = ButtonDefaults.buttonColors(Color.Transparent),
-          elevation =
-              ButtonDefaults.buttonElevation(
-                  defaultElevation = 0.dp,
-                  pressedElevation = 0.dp,
-                  disabledElevation = 0.dp,
-              ),
-          shape = RoundedCornerShape(10),
-      ) {
-        Text("Upload Post", color = Color.Black)
-      }
-      PostLists(
-          isContextLoading = isLoading,
-          postLoading = isPostLoading,
-          posts = posts,
-          modifier = Modifier.weight(1f).padding(1.dp).fillMaxSize(),
-      ) { post ->
-        navigateTo(
-            navController = navController,
-            DestinationScreen.SinglePost,
-            NavParam("post", post),
-        )
-      }
+    }
+    PostLists(
+        isContextLoading = isLoading,
+        postLoading = isPostLoading,
+        posts = posts,
+        modifier = Modifier.weight(1f).padding(1.dp).fillMaxSize(),
+    ) { post ->
+      navigateTo(
+          navController = navController,
+          DestinationScreen.SinglePost,
+          NavParam("post", post),
+      )
     }
     BottomNavigationMenu(BottomNavItem.POSTS, navController)
   }
-
-  if (isLoading) MyPostScreenShimmer()
 }
 
 @Composable
@@ -156,7 +193,7 @@ fun PostLists(
       if (!isContextLoading) Text("No post Available")
     }
   } else {
-    LazyColumn(modifier = Modifier) {
+    LazyColumn(modifier = modifier) {
       val rows = arrayListOf<PostRow>()
       var currentRow = PostRow()
       rows.add(currentRow)

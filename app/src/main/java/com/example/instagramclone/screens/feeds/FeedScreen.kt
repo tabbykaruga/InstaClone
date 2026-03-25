@@ -1,7 +1,9 @@
 package com.example.instagramclone.screens.feeds
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -33,12 +35,14 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -46,6 +50,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
@@ -63,6 +68,7 @@ import com.example.instagramclone.sharedUtils.ProfileImageCard
 import com.example.instagramclone.sharedUtils.navigateTo
 import com.example.instagramclone.viewModel.AuthViewModel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @Composable
 fun FeedScreen(
@@ -74,24 +80,74 @@ fun FeedScreen(
   val userData = vm.userData.value
   val userFeed = vm.postsFeed.value
   val userFeedLoading = vm.postsFeedProgress.value
+  val currentUserName = userData?.username
+  val currentName = userData?.name
+
+  // refresh
+  var isRefreshing by remember { mutableStateOf(false) }
+  val coroutineScope = rememberCoroutineScope()
 
   Scaffold(
       containerColor = Color(0xFFF0F0F0),
       bottomBar = { BottomNavigationMenu(BottomNavItem.FEED, navController) },
   ) { padding ->
-    Column(modifier = Modifier.fillMaxSize().padding(padding).background(Color(0xFFF0F0F0))) {
-      ProfileImageCard(
-          userImg = userData?.imageUrl,
-          modifier = Modifier.padding(8.dp).size(100.dp),
-      )
-      FeedPostList(
-          posts = userFeed,
+    Column(modifier = Modifier.padding(padding).background(Color(0xFFF0F0F0))) {
+      Card(
+          modifier =
+              Modifier.padding(16.dp).clickable {
+                navigateTo(navController, DestinationScreen.MyPost)
+              },
+          elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+          shape = RoundedCornerShape(16.dp),
+          colors = CardDefaults.cardColors(containerColor = Color.White),
+      ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
+        ) {
+          ProfileImageCard(
+              userImg = userData?.imageUrl,
+              modifier = Modifier.size(100.dp),
+          )
+          Column(
+              modifier = Modifier.padding(start = 16.dp),
+              verticalArrangement = Arrangement.Center,
+          ) {
+            Text(
+                currentName ?: "",
+                fontWeight = FontWeight.Bold,
+                fontSize = 16.sp,
+            )
+            Text(
+                currentUserName ?: "",
+                fontStyle = FontStyle.Italic,
+                fontSize = 14.sp,
+                color = Color.Gray,
+            )
+          }
+        }
+      }
+      PullToRefreshBox(
+          isRefreshing = isRefreshing,
+          onRefresh = {
+            coroutineScope.launch {
+              isRefreshing = true
+              vm.refreshFeed()
+              isRefreshing = false
+            }
+          },
           modifier = Modifier.weight(1f),
-          loading = userFeedLoading or userDataLoading,
-          navController = navController,
-          vm = vm,
-          currentUserId = userData?.userId ?: "",
-      )
+      ) {
+        FeedPostList(
+            posts = userFeed,
+            modifier = Modifier.fillMaxSize(),
+            loading = userFeedLoading or userDataLoading,
+            navController = navController,
+            vm = vm,
+            currentUserId = userData?.userId ?: "",
+        )
+      }
     }
   }
 }
@@ -106,11 +162,9 @@ fun FeedPostList(
     currentUserId: String,
 ) {
   Box(modifier = modifier) {
-    LazyColumn {
+    LazyColumn(modifier = Modifier.fillMaxSize()) {
       if (loading) {
-        items(3) { // ← 3 shimmer cards while loading
-          FeedScreenShimmer()
-        }
+        items(3) { FeedScreenShimmer() }
       } else {
         items(items = posts) {
           SingleFeedPost(
@@ -142,8 +196,18 @@ fun SingleFeedPost(
   val comments = vm.commentsMap[post.postId] ?: emptyList()
   val sheetState = rememberModalBottomSheetState()
   var showCommentsSheet by remember { mutableStateOf(false) }
+  var userProfileImage by remember { mutableStateOf<String?>(null) }
+  var userName by remember { mutableStateOf<String?>("") }
 
   LaunchedEffect(post.postId) { vm.getComments(post.postId) }
+  LaunchedEffect(post.userId) {
+    post.userId?.let { userId ->
+      vm.getUserById(userId) { user ->
+        userProfileImage = user?.imageUrl
+        userName = user?.username
+      }
+    }
+  }
 
   Card(
       shape = RoundedCornerShape(corner = CornerSize(16.dp)),
@@ -159,14 +223,14 @@ fun SingleFeedPost(
       ) {
         Card(shape = CircleShape, modifier = Modifier.padding(4.dp).size(32.dp)) {
           AsyncImage(
-              model = post.userImage,
+              model = userProfileImage,
               contentDescription = null,
               modifier = Modifier.fillMaxSize(),
               contentScale = ContentScale.Crop,
           )
         }
         Column {
-          Text(post.userName ?: "")
+          Text(userName ?: "")
           Text(
               text = post.postLocation ?: "",
               style = MaterialTheme.typography.bodySmall,
@@ -191,7 +255,7 @@ fun SingleFeedPost(
                       onTap = { onPostClick.invoke() },
                   )
                 },
-            contentScale = ContentScale.FillWidth,
+            contentScale = ContentScale.Crop,
         )
         if (showLikeAnimation.value) {
           LaunchedEffect(showLikeAnimation.value) {

@@ -26,6 +26,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.CornerSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -101,8 +102,11 @@ fun CommentsShimmer() {
 @Composable
 fun FeedScreenShimmer() {
   Card(
-      shape = RoundedCornerShape(corner = CornerSize(4.dp)),
-      modifier = Modifier.fillMaxWidth().wrapContentHeight().padding(top = 4.dp, bottom = 4.dp),
+      shape = RoundedCornerShape(corner = CornerSize(16.dp)),
+      modifier =
+          Modifier.fillMaxWidth().wrapContentHeight().padding(horizontal = 12.dp, vertical = 6.dp),
+      elevation = CardDefaults.cardElevation(defaultElevation = 4.dp), // ← elevation
+      colors = CardDefaults.cardColors(containerColor = Color.White),
   ) {
     Column {
       // Header row - avatar + username

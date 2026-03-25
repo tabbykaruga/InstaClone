@@ -9,8 +9,6 @@ object ImageUploader {
 
     MediaManager.get()
         .upload(imageUri)
-        .option("eager", "c_fill,w_1080,h_1080,g_center") // ← no import needed, just a string
-        .option("eager_async", false)
         .callback(
             object : com.cloudinary.android.callback.UploadCallback {
 

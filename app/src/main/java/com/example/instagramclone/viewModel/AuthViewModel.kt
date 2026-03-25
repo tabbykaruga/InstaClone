@@ -37,6 +37,7 @@ constructor(val auth: FirebaseAuth, val db: FirebaseFirestore, application: Appl
   val userData = mutableStateOf<UserData?>(null)
   val popupNotification = mutableStateOf<Event<String>?>(null)
   val followers = mutableIntStateOf(0)
+  val onFollowProgress = mutableStateOf(false)
 
   // POST
   val refreshPostProgress = mutableStateOf(false)
@@ -66,10 +67,6 @@ constructor(val auth: FirebaseAuth, val db: FirebaseFirestore, application: Appl
   }
 
   fun onSignUp(username: String, email: String, password: String) {
-    if (username.isEmpty() || email.isEmpty() || password.isEmpty()) {
-      handleException(customMessage = "Please fill in all fields")
-      return
-    }
 
     // CHECK IF USERNAME IS UNIQUE
     inProgress.value = true
@@ -79,7 +76,11 @@ constructor(val auth: FirebaseAuth, val db: FirebaseFirestore, application: Appl
         .get()
         .addOnSuccessListener { documents ->
           if (documents.size() > 0) {
-            handleException(customMessage = "Username Already exist")
+            handleException(
+                popupNotification,
+                null,
+                customMessage = "Username Already exist",
+            )
             inProgress.value = false
           } else {
             auth.createUserWithEmailAndPassword(email, password).addOnCompleteListener { task ->
@@ -89,26 +90,20 @@ constructor(val auth: FirebaseAuth, val db: FirebaseFirestore, application: Appl
                 // CREATE PROFILE
                 createOrUpdateProfile(username = username)
               } else {
-                handleException(task.exception, "Sign Up Failed")
+                handleException(popupNotification, task.exception, "Sign Up Failed")
               }
               inProgress.value = false
             }
           }
         }
         .addOnFailureListener { e ->
-          handleException(e, "Failed to check username")
+          handleException(popupNotification, e, "Failed to check username")
           inProgress.value = false
         }
   }
 
   fun onLogin(email: String, password: String) {
-    if (email.isEmpty() or password.isEmpty()) {
-      handleException(customMessage = "Please fill in all fields")
-      return
-    }
-
     inProgress.value = true
-
     auth
         .signInWithEmailAndPassword(email, password)
         .addOnCompleteListener { task ->
@@ -117,14 +112,18 @@ constructor(val auth: FirebaseAuth, val db: FirebaseFirestore, application: Appl
             inProgress.value = false
             auth.currentUser?.uid?.let { uId -> getUserData(uId) }
           } else {
-            handleException(task.exception, "Login failed")
+            handleException(popupNotification, task.exception, "Login failed")
             inProgress.value = false
           }
         }
         .addOnFailureListener { e ->
-          handleException(e, "Login Failed")
+          handleException(popupNotification, e, "Login Failed")
           inProgress.value = false
         }
+  }
+
+  fun onPasswordMismatch() {
+    handleException(popupNotification, customMessage = "Passwords do not match")
   }
 
   fun onLogOut() {
@@ -180,7 +179,7 @@ constructor(val auth: FirebaseAuth, val db: FirebaseFirestore, application: Appl
                     inProgress.value = false
                   }
                   .addOnFailureListener { e ->
-                    handleException(e, "Cannot Update user")
+                    handleException(popupNotification, e, "Cannot Update user")
                     inProgress.value = false
                   }
             } else {
@@ -192,7 +191,7 @@ constructor(val auth: FirebaseAuth, val db: FirebaseFirestore, application: Appl
             }
           }
           .addOnFailureListener { e ->
-            handleException(e, "Cannot create user")
+            handleException(popupNotification, e, "Cannot create user")
             inProgress.value = false
           }
     }
@@ -215,7 +214,7 @@ constructor(val auth: FirebaseAuth, val db: FirebaseFirestore, application: Appl
           getFollowers(user?.userId)
         }
         .addOnFailureListener { e ->
-          handleException(e, "Cannot Retrieve user data")
+          handleException(popupNotification, e, "Cannot Retrieve user data")
           inProgress.value = false
         }
   }
@@ -244,13 +243,24 @@ constructor(val auth: FirebaseAuth, val db: FirebaseFirestore, application: Appl
           inProgress.value = false
         },
         onError = {
-          handleException(customMessage = "Image upload failed")
+          handleException(popupNotification, customMessage = "Profile Image upload failed")
+          createOrUpdateProfile(
+              name = name,
+              username = userName,
+              bio = bio,
+              imageUrl = userData.value?.imageUrl,
+          )
           inProgress.value = false
         },
     )
   }
 
   // ----------------- POST --------------
+  fun refreshFeed() {
+    postsFeedProgress.value = true
+    getPersonalizedFeed() // your existing feed function
+  }
+
   fun onCreateNewPost(
       imageUri: Uri,
       description: String,
@@ -302,17 +312,17 @@ constructor(val auth: FirebaseAuth, val db: FirebaseFirestore, application: Appl
                   onPostSuccess.invoke()
                 }
                 .addOnFailureListener { e ->
-                  handleException(e, "Unable to create a post")
+                  handleException(popupNotification, e, "Unable to create a post")
                   inProgress.value = false
                 }
           } else {
 
-            handleException(customMessage = "User not logged in")
+            handleException(popupNotification, customMessage = "User not logged in")
             inProgress.value = false
           }
         },
         onError = {
-          handleException(customMessage = "Image upload failed")
+          handleException(popupNotification, customMessage = "Image upload failed")
           inProgress.value = false
         },
     )
@@ -322,14 +332,14 @@ constructor(val auth: FirebaseAuth, val db: FirebaseFirestore, application: Appl
     val currentUid = auth.currentUser?.uid
 
     if (currentUid == null || currentUid != post.userId) {
-      handleException(customMessage = "Unauthorized to delete this post")
+      handleException(popupNotification, customMessage = "Unauthorized to delete this post")
       return
     }
 
     val postId =
         post.postId
             ?: run {
-              handleException(customMessage = "Invalid post")
+              handleException(popupNotification, customMessage = "Invalid post")
               return
             }
 
@@ -347,7 +357,7 @@ constructor(val auth: FirebaseAuth, val db: FirebaseFirestore, application: Appl
           onSuccess.invoke()
         }
         .addOnFailureListener { e ->
-          handleException(e, "Unable to delete post")
+          handleException(popupNotification, e, "Unable to delete post")
           inProgress.value = false
         }
   }
@@ -365,11 +375,14 @@ constructor(val auth: FirebaseAuth, val db: FirebaseFirestore, application: Appl
             refreshPostProgress.value = false
           }
           .addOnFailureListener { e ->
-            handleException(e, "Cannot fetch Post")
+            handleException(popupNotification, e, "Cannot fetch Post")
             refreshPostProgress.value = false
           }
     } else {
-      handleException(customMessage = "Error :Username unavailable.Unable to create a new post")
+      handleException(
+          popupNotification,
+          customMessage = "Error :Username unavailable.Unable to create a new post",
+      )
       onLogOut()
     }
   }
@@ -390,7 +403,7 @@ constructor(val auth: FirebaseAuth, val db: FirebaseFirestore, application: Appl
           randomPostsProgress.value = false
         }
         .addOnFailureListener { e ->
-          handleException(e, "Unable to fetch posts")
+          handleException(popupNotification, e, "Unable to fetch posts")
           randomPostsProgress.value = false
         }
   }
@@ -422,7 +435,7 @@ constructor(val auth: FirebaseAuth, val db: FirebaseFirestore, application: Appl
             searchedPostProgress.value = false
           }
           .addOnFailureListener { e ->
-            handleException(e, "Cannot search post")
+            handleException(popupNotification, e, "Cannot search post")
             searchedPostProgress.value = false
           }
     }
@@ -430,6 +443,7 @@ constructor(val auth: FirebaseAuth, val db: FirebaseFirestore, application: Appl
 
   // -------------------FOLLOWING /FOLLOWERS-----------------
   fun onFollowClick(userId: String) {
+    onFollowProgress.value = true
     auth.currentUser?.uid?.let { currentUser ->
       val following = arrayListOf<String>()
       userData.value?.following?.let { following.addAll(it) }
@@ -442,9 +456,17 @@ constructor(val auth: FirebaseAuth, val db: FirebaseFirestore, application: Appl
       db.collection(USERS)
           .document(currentUser)
           .update("following", following)
-          .addOnSuccessListener { getUserData(currentUser) }
+          .addOnSuccessListener {
+            getUserData(currentUser)
+            onFollowProgress.value = false
+          }
           .addOnFailureListener { e ->
-            handleException(e, "Unable to follow/Unfollow. Please try again later.")
+            handleException(
+                popupNotification,
+                e,
+                "Unable to follow/Unfollow. Please try again later.",
+            )
+            onFollowProgress.value = false
           }
     }
   }
@@ -457,119 +479,67 @@ constructor(val auth: FirebaseAuth, val db: FirebaseFirestore, application: Appl
   }
 
   // -------------------FEED -----------------
-
   private fun getPersonalizedFeed() {
     val following = userData.value?.following
     val currentUserId = auth.currentUser?.uid
     postsFeedProgress.value = true
 
-    // Always fetch random posts from other users
     val randomPostsTask =
-        db.collection(POSTS)
-            .whereNotEqualTo("userId", currentUserId) // exclude own posts
-            .limit(20)
-            .get()
+        db.collection(POSTS).whereNotEqualTo("userId", currentUserId).limit(20).get()
 
     if (!following.isNullOrEmpty()) {
-      // Fetch posts from followed users
       db.collection(POSTS)
           .whereIn("userId", following)
           .get()
           .addOnSuccessListener { followingDocs ->
             val followingPosts = followingDocs.toObjects(PostData::class.java)
 
-            // Then fetch random posts
             randomPostsTask
                 .addOnSuccessListener { randomDocs ->
                   val randomPosts =
                       randomDocs
                           .toObjects(PostData::class.java)
-                          .filter { it.userId !in following } // avoid duplicates from following
+                          .filter { it.userId !in following }
                           .shuffled()
 
-                  // Merge: following posts first, then random
-                  val mergedPosts = (followingPosts + randomPosts).distinctBy { it.postId }
-
-                  postsFeed.value = mergedPosts
-                  changePostUsernames(postsFeed.value, postsFeed) {
-                    postsFeedProgress.value = false
-                  }
+                  val merged = (followingPosts + randomPosts).distinctBy { it.postId }
+                  postsFeed.value = intervalPosts(merged) // ✅ interleave
+                  postsFeedProgress.value = false
                 }
                 .addOnFailureListener {
-                  // If random fetch fails, just show following posts
-                  postsFeed.value = followingPosts
-                  changePostUsernames(postsFeed.value, postsFeed) {
-                    postsFeedProgress.value = false
-                  }
+                  postsFeed.value = intervalPosts(followingPosts) // ✅ interleave
+                  postsFeedProgress.value = false
                 }
           }
           .addOnFailureListener { e ->
-            handleException(e, "Unable to get feed at the moment. Please try again later.")
+            handleException(popupNotification, e, "Unable to get feed")
             postsFeedProgress.value = false
           }
     } else {
-      // Not following anyone — just show random posts from others
       randomPostsTask
           .addOnSuccessListener { randomDocs ->
-            val randomPosts = randomDocs.toObjects(PostData::class.java).shuffled()
-            postsFeed.value = randomPosts
-            changePostUsernames(postsFeed.value, postsFeed) { postsFeedProgress.value = false }
+            val posts = randomDocs.toObjects(PostData::class.java).shuffled()
+            postsFeed.value = intervalPosts(posts) // ✅ interleave
+            postsFeedProgress.value = false
           }
           .addOnFailureListener { e ->
-            handleException(e, "Unable to get feed at the moment. Please try again later.")
+            handleException(popupNotification, e, "Unable to get feed")
             postsFeedProgress.value = false
           }
     }
   }
 
-  private fun changePostUsernames(
-      posts: List<PostData>,
-      outState: MutableState<List<PostData>>,
-      onComplete: (() -> Unit)? = null,
-  ) {
-    val distinctUserIds = posts.mapNotNull { it.userId }.distinct()
-    var completed = 0
+  private fun intervalPosts(posts: List<PostData>): List<PostData> {
+    // group posts by userId
+    val groupedByUser = posts.groupBy { it.userId }.values.map { it.toMutableList() }
+    val result = mutableListOf<PostData>()
+    val queues = groupedByUser.map { ArrayDeque(it) }.toMutableList()
 
-    data class UserInfo(val username: String, val userImage: String)
-    val userInfoMap = mutableMapOf<String, UserInfo>()
-
-    if (distinctUserIds.isEmpty()) {
-      onComplete?.invoke()
-      return
+    // round robin - take one post from each user at a time
+    while (queues.any { it.isNotEmpty() }) {
+      queues.filter { it.isNotEmpty() }.forEach { queue -> result.add(queue.removeFirst()) }
     }
-
-    distinctUserIds.forEach { userId ->
-      db.collection(USERS)
-          .document(userId)
-          .get()
-          .addOnSuccessListener { doc ->
-            userInfoMap[userId] =
-                UserInfo(
-                    username = doc.getString("username") ?: "",
-                    userImage = doc.getString("imageUrl") ?: "",
-                )
-            completed++
-
-            if (completed == distinctUserIds.size) {
-              outState.value =
-                  posts.map { post ->
-                    val info = userInfoMap[post.userId]
-                    post.copy(
-                        userName = info?.username ?: "",
-                        userImage = info?.userImage ?: "",
-                    )
-                  }
-              onComplete?.invoke()
-            }
-          }
-          .addOnFailureListener {
-            completed++
-            if (completed == distinctUserIds.size) {
-              outState.value = posts
-              onComplete?.invoke()
-            }
-          }
-    }
+    return result
   }
 
   fun onLikePost(postData: PostData) {
@@ -595,7 +565,9 @@ constructor(val auth: FirebaseAuth, val db: FirebaseFirestore, application: Appl
       db.collection(POSTS)
           .document(postId)
           .update("likes", newLikes) // ← use update() instead of set() with merge
-          .addOnFailureListener { e -> handleException(e, "Unable to like post") }
+          .addOnFailureListener { e ->
+            handleException(popupNotification, e, "Unable to like post")
+          }
     }
   }
 
@@ -620,7 +592,11 @@ constructor(val auth: FirebaseAuth, val db: FirebaseFirestore, application: Appl
             getComments(postId)
           }
           .addOnFailureListener { e ->
-            handleException(e, "Cannot be able to add a comment.Please try again later")
+            handleException(
+                popupNotification,
+                e,
+                "Cannot be able to add a comment.Please try again later",
+            )
           }
     }
   }
@@ -681,7 +657,7 @@ constructor(val auth: FirebaseAuth, val db: FirebaseFirestore, application: Appl
           }
         }
         .addOnFailureListener { e ->
-          handleException(e, "Unable to fetch comments. Please try again later.")
+          handleException(popupNotification, e, "Unable to fetch comments. Please try again later.")
           commentProgress.value = false
         }
   }

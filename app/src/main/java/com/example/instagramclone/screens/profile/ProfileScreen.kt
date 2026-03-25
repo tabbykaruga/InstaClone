@@ -23,7 +23,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
@@ -86,10 +85,6 @@ fun ProfileScreen(navController: NavController, vm: AuthViewModel) {
           navigateTo(navController, DestinationScreen.MyPost)
         },
         onBack = { navigateTo(navController, DestinationScreen.MyPost) },
-        onLogOut = {
-          vm.onLogOut()
-          navigateTo(navController, DestinationScreen.Login)
-        },
     )
   }
 }
@@ -107,7 +102,6 @@ fun ProfileContent(
     onImageSelected: (Uri) -> Unit,
     onSave: () -> Unit,
     onBack: () -> Unit,
-    onLogOut: () -> Unit,
 ) {
   val scrollState = rememberScrollState()
   val imageUrl = vm.userData.value?.imageUrl
@@ -132,11 +126,6 @@ fun ProfileContent(
           imageVector = Icons.AutoMirrored.Filled.ArrowBack,
           contentDescription = "Back",
           modifier = Modifier.clickable { onBack.invoke() },
-      )
-      Icon(
-          imageVector = Icons.AutoMirrored.Filled.Logout,
-          contentDescription = "Log Out",
-          modifier = Modifier.clickable { onLogOut.invoke() },
       )
     }
     Divider()
@@ -250,7 +239,7 @@ fun ProfileImage(
           CommonImage(data = imageUrl, modifier = Modifier.fillMaxSize())
         }
       }
-      Text("Change profile Picture", color = Color.Blue)
+      Text("Change profile picture", color = Color.Blue)
     }
 
     if (isLoading) CommonProgressSpinner()
