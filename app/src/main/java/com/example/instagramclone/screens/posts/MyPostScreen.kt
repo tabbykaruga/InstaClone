@@ -80,7 +80,7 @@ fun MyPostScreen(navController: NavController, vm: AuthViewModel) {
   Column(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
     Column(modifier = Modifier.weight(1f).padding(top = 20.dp)) {
       Row(modifier = Modifier.padding()) {
-        ProfileImage(userData?.imageUrl) { newPostImageLauncher.launch("image/*") }
+        ProfileImage(userData?.imageUrl) { navigateTo(navController, DestinationScreen.Profile) }
 
         Text(
             "$noOfPost \nposts",
@@ -105,7 +105,7 @@ fun MyPostScreen(navController: NavController, vm: AuthViewModel) {
         Text(userData?.bio ?: "")
       }
       OutlinedButton(
-          onClick = { navigateTo(navController, DestinationScreen.Profile) },
+          onClick = { newPostImageLauncher.launch("image/*") },
           modifier = Modifier.padding(18.dp).fillMaxWidth(),
           colors = ButtonDefaults.buttonColors(Color.Transparent),
           elevation =
@@ -116,7 +116,7 @@ fun MyPostScreen(navController: NavController, vm: AuthViewModel) {
               ),
           shape = RoundedCornerShape(10),
       ) {
-        Text("Edit Profile", color = Color.Black)
+        Text("Upload Post", color = Color.Black)
       }
       PostLists(
           isContextLoading = isLoading,

@@ -16,7 +16,6 @@ import com.example.instagramclone.sharedUtils.fillerWords
 import com.example.instagramclone.sharedUtils.handleException
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.QuerySnapshot
 import com.google.firebase.firestore.ktx.toObject
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -136,6 +135,17 @@ constructor(val auth: FirebaseAuth, val db: FirebaseFirestore, application: Appl
     searchedPosts.value = listOf()
     postsFeed.value = listOf()
     comments.value = listOf()
+  }
+
+  fun getUserById(userId: String, onResult: (UserData?) -> Unit) {
+    db.collection(USERS)
+        .document(userId)
+        .get()
+        .addOnSuccessListener { document ->
+          val user = document.toObject(UserData::class.java)
+          onResult(user)
+        }
+        .addOnFailureListener { onResult(null) }
   }
 
   private fun createOrUpdateProfile(
@@ -402,6 +412,7 @@ constructor(val auth: FirebaseAuth, val db: FirebaseFirestore, application: Appl
   fun searchPost(searchTerm: String) {
     if (searchTerm.isNotEmpty()) {
       searchedPostProgress.value = true
+      searchedPosts.value = emptyList()
 
       db.collection(POSTS)
           .whereArrayContains("searchTerms", searchTerm.trim().lowercase(Locale.ROOT))
@@ -449,62 +460,66 @@ constructor(val auth: FirebaseAuth, val db: FirebaseFirestore, application: Appl
 
   private fun getPersonalizedFeed() {
     val following = userData.value?.following
+    val currentUserId = auth.currentUser?.uid
+    postsFeedProgress.value = true
+
+    // Always fetch random posts from other users
+    val randomPostsTask =
+        db.collection(POSTS)
+            .whereNotEqualTo("userId", currentUserId) // exclude own posts
+            .limit(20)
+            .get()
 
     if (!following.isNullOrEmpty()) {
-      postsFeedProgress.value = true
+      // Fetch posts from followed users
       db.collection(POSTS)
           .whereIn("userId", following)
           .get()
-          .addOnSuccessListener {
-            convertPosts(documents = it, postsFeed)
-            changePostUsernames(postsFeed.value, postsFeed) {
-              if (postsFeed.value.isEmpty()) getGeneralUserFeed()
-              else postsFeedProgress.value = false
-            }
+          .addOnSuccessListener { followingDocs ->
+            val followingPosts = followingDocs.toObjects(PostData::class.java)
+
+            // Then fetch random posts
+            randomPostsTask
+                .addOnSuccessListener { randomDocs ->
+                  val randomPosts =
+                      randomDocs
+                          .toObjects(PostData::class.java)
+                          .filter { it.userId !in following } // avoid duplicates from following
+                          .shuffled()
+
+                  // Merge: following posts first, then random
+                  val mergedPosts = (followingPosts + randomPosts).distinctBy { it.postId }
+
+                  postsFeed.value = mergedPosts
+                  changePostUsernames(postsFeed.value, postsFeed) {
+                    postsFeedProgress.value = false
+                  }
+                }
+                .addOnFailureListener {
+                  // If random fetch fails, just show following posts
+                  postsFeed.value = followingPosts
+                  changePostUsernames(postsFeed.value, postsFeed) {
+                    postsFeedProgress.value = false
+                  }
+                }
           }
           .addOnFailureListener { e ->
-            handleException(
-                e,
-                "Unable to get feed at the moment.Please try again later.",
-            )
+            handleException(e, "Unable to get feed at the moment. Please try again later.")
             postsFeedProgress.value = false
           }
     } else {
-      getGeneralUserFeed()
-    }
-  }
-
-  fun getGeneralUserFeed() {
-    postsFeedProgress.value = true
-
-    db.collection(POSTS)
-        .orderBy("time", Query.Direction.DESCENDING)
-        .limit(50)
-        .get()
-        .addOnSuccessListener { it ->
-          convertPosts(it, postsFeed)
-
-          changePostUsernames(postsFeed.value, postsFeed) {
-            if (postsFeed.value.isEmpty()) {
-              db.collection(POSTS)
-                  .orderBy("time", Query.Direction.DESCENDING)
-                  .limit(20)
-                  .get()
-                  .addOnSuccessListener { docs ->
-                    convertPosts(docs, postsFeed)
-                    changePostUsernames(postsFeed.value, postsFeed) {
-                      postsFeedProgress.value = false
-                    }
-                  }
-            } else {
-              postsFeedProgress.value = false
-            }
+      // Not following anyone — just show random posts from others
+      randomPostsTask
+          .addOnSuccessListener { randomDocs ->
+            val randomPosts = randomDocs.toObjects(PostData::class.java).shuffled()
+            postsFeed.value = randomPosts
+            changePostUsernames(postsFeed.value, postsFeed) { postsFeedProgress.value = false }
           }
-        }
-        .addOnFailureListener { e ->
-          handleException(e, "Unable to get feed at the moment. Please try again later.")
-          postsFeedProgress.value = false
-        }
+          .addOnFailureListener { e ->
+            handleException(e, "Unable to get feed at the moment. Please try again later.")
+            postsFeedProgress.value = false
+          }
+    }
   }
 
   private fun changePostUsernames(

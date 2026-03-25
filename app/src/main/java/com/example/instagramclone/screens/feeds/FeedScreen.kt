@@ -1,5 +1,6 @@
 package com.example.instagramclone.screens.feeds
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,6 +25,7 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -43,7 +45,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.example.instagramclone.data.PostData
@@ -71,8 +75,11 @@ fun FeedScreen(
   val userFeed = vm.postsFeed.value
   val userFeedLoading = vm.postsFeedProgress.value
 
-  Scaffold(bottomBar = { BottomNavigationMenu(BottomNavItem.FEED, navController) }) { padding ->
-    Column(modifier = Modifier.fillMaxSize().padding(padding)) {
+  Scaffold(
+      containerColor = Color(0xFFF0F0F0),
+      bottomBar = { BottomNavigationMenu(BottomNavItem.FEED, navController) },
+  ) { padding ->
+    Column(modifier = Modifier.fillMaxSize().padding(padding).background(Color(0xFFF0F0F0))) {
       ProfileImageCard(
           userImg = userData?.imageUrl,
           modifier = Modifier.padding(8.dp).size(100.dp),
@@ -139,8 +146,11 @@ fun SingleFeedPost(
   LaunchedEffect(post.postId) { vm.getComments(post.postId) }
 
   Card(
-      shape = RoundedCornerShape(corner = CornerSize(4.dp)),
-      modifier = Modifier.fillMaxWidth().wrapContentHeight().padding(top = 4.dp, bottom = 4.dp),
+      shape = RoundedCornerShape(corner = CornerSize(16.dp)),
+      modifier =
+          Modifier.fillMaxWidth().wrapContentHeight().padding(horizontal = 12.dp, vertical = 6.dp),
+      elevation = CardDefaults.cardElevation(defaultElevation = 4.dp), // ← elevation
+      colors = CardDefaults.cardColors(containerColor = Color.White),
   ) {
     Column {
       Row(
@@ -221,6 +231,12 @@ fun SingleFeedPost(
             modifier = Modifier.padding(start = 4.dp),
         )
       }
+      Text(
+          text = "#${post.postDescription}",
+          fontStyle = FontStyle.Italic,
+          fontSize = 12.sp,
+          modifier = Modifier.padding(start = 20.dp, top = 0.dp, bottom = 4.dp),
+      )
     }
     if (showCommentsSheet) {
       ModalBottomSheet(

@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -25,6 +24,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -42,7 +42,6 @@ import com.example.instagramclone.data.PostData
 import com.example.instagramclone.routes.DestinationScreen
 import com.example.instagramclone.screens.BottomNavItem
 import com.example.instagramclone.screens.BottomNavigationMenu
-import com.example.instagramclone.screens.posts.PostLists
 import com.example.instagramclone.sharedUtils.GeneralPostImage
 import com.example.instagramclone.sharedUtils.MyPostGridShimmer
 import com.example.instagramclone.sharedUtils.NavParam
@@ -59,33 +58,45 @@ fun SearchScreen(navController: NavController, vm: AuthViewModel) {
   val randomPostsLoading = vm.randomPostsProgress.value
   val isSearching = searchTerm.isNotEmpty()
 
+  LaunchedEffect(Unit) { vm.getRandomPosts() }
+
   Scaffold(bottomBar = { BottomNavigationMenu(BottomNavItem.SEARCH, navController) }) { padding ->
     Column(modifier = Modifier.fillMaxSize().padding(padding)) {
       // Search bar — always visible
       SearchBar(
           searchTerm = searchTerm,
-          onSearchChange = {
-            searchTerm = it
-            if (it.isEmpty()) vm.searchedPosts.value = emptyList() // clear results when cleared
+          onSearchChange = { newTerm ->
+            searchTerm = newTerm
+            if (newTerm.isEmpty()) {
+              vm.searchedPosts.value = emptyList()
+            }
           },
           onSearch = { vm.searchPost(searchTerm) },
       )
-
-      if (isSearching) {
-        // Show search results using existing PostLists grid
-        PostLists(
-            isContextLoading = false,
-            postLoading = searchedPostLoading,
-            posts = searchedPosts,
-            modifier = Modifier.fillMaxSize().padding(8.dp).imePadding(),
-        ) { post ->
-          navigateTo(navController, DestinationScreen.SinglePost, NavParam("post", post))
-        }
-      } else {
-        // Show random posts grid
-        if (randomPostsLoading) {
+      when {
+        // Searching — show loader or results
+        isSearching && searchedPostLoading -> {
           MyPostGridShimmer()
-        } else {
+        }
+        isSearching && !searchedPostLoading -> {
+          if (searchedPosts.isEmpty()) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+              Text("No results for \"$searchTerm\"", color = Color.Gray)
+            }
+          } else {
+            RandomPostsGrid(
+                posts = searchedPosts,
+                onPostClick = { post ->
+                  navigateTo(navController, DestinationScreen.SinglePost, NavParam("post", post))
+                },
+            )
+          }
+        }
+        // Not searching — show random posts
+        randomPostsLoading -> {
+          MyPostGridShimmer()
+        }
+        else -> {
           RandomPostsGrid(
               posts = randomPosts,
               onPostClick = { post ->

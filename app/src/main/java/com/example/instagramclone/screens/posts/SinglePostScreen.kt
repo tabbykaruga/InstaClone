@@ -7,7 +7,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -111,24 +111,43 @@ fun SinglePostDisplay(
 ) {
   val userData = vm.userData.value
   val currentUserId = userData?.userId
-  val currentPost = vm.postsFeed.value.find { it.postId == post.postId } ?: post
+  val currentPost =
+      vm.postsFeed.value.find { it.postId == post.postId }
+          ?: vm.posts.value.find { it.postId == post.postId }
+          ?: post
+  // ← fetch post owner's profile directly from Firestore
+  var postOwnerImage by remember { mutableStateOf<String?>(null) }
+  var postOwnerName by remember { mutableStateOf<String?>(null) }
+
+  // Use fetched data, fallback chain: fetched → post field → own userData
+  val displayImage = currentPost.userImage ?: postOwnerImage ?: userData?.imageUrl
+  val displayName = currentPost.userName ?: postOwnerName ?: userData
   val isLiked = currentPost.likes?.contains(currentUserId) == true
   val likesCount = currentPost.likes?.size ?: 0
   val showLikeAnimation = remember { mutableStateOf(false) }
   val showDislikeAnimation = remember { mutableStateOf(false) }
 
+  LaunchedEffect(post.userId) {
+    post.userId?.let { userId ->
+      vm.getUserById(userId) { user ->
+        postOwnerImage = user?.imageUrl
+        postOwnerName = user?.username
+      }
+    }
+  }
+
   Box(modifier = Modifier.fillMaxWidth().height(48.dp)) {
     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
       Card(shape = CircleShape, modifier = Modifier.padding(8.dp).size(32.dp)) {
         AsyncImage(
-            model = post.userImage,
+            model = displayImage,
             contentDescription = null,
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Crop,
         )
       }
       Column {
-        Text(post.userName ?: "")
+        Text("$displayName")
         Text(
             text = post.postLocation ?: "",
             style = MaterialTheme.typography.bodySmall,
@@ -169,7 +188,7 @@ fun SinglePostDisplay(
     GeneralPostImage(
         data = currentPost.postImage,
         modifier =
-            Modifier.fillMaxWidth().defaultMinSize(minHeight = 130.dp).pointerInput(Unit) {
+            Modifier.fillMaxWidth().aspectRatio(1f).pointerInput(Unit) {
               detectTapGestures(
                   onDoubleTap = {
                     if (currentPost.likes?.contains(currentUserId) == true) {
@@ -181,7 +200,7 @@ fun SinglePostDisplay(
                   },
               )
             },
-        contentScale = ContentScale.FillWidth,
+        contentScale = ContentScale.Crop,
     )
     if (showLikeAnimation.value) {
       LaunchedEffect(showLikeAnimation.value) {
