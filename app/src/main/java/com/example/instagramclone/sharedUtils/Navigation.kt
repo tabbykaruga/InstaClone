@@ -1,5 +1,6 @@
 package com.example.instagramclone.sharedUtils
 
+import android.os.Parcelable
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -7,7 +8,17 @@ import androidx.navigation.NavController
 import com.example.instagramclone.routes.DestinationScreen
 import com.example.instagramclone.viewModel.AuthViewModel
 
-fun navigateTo(navController: NavController, destScreen: DestinationScreen) {
+data class NavParam(val name: String, val value: Parcelable)
+
+fun navigateTo(
+    navController: NavController,
+    destScreen: DestinationScreen,
+    vararg params: NavParam,
+) {
+  for (param in params) {
+    navController.currentBackStackEntry?.arguments?.putParcelable(param.name, param.value)
+  }
+
   navController.navigate(destScreen.route) {
     popUpTo(destScreen.route)
     launchSingleTop = true
@@ -21,6 +32,6 @@ fun CheckSignedIn(navController: NavController, vm: AuthViewModel) {
 
   if (signedIn && !alreadyLoggedIn.value) {
     alreadyLoggedIn.value = true
-    navController.navigate(DestinationScreen.MyPost.route) { popUpTo(0) }
+    navController.navigate(DestinationScreen.Feed.route) { popUpTo(0) }
   }
 }
