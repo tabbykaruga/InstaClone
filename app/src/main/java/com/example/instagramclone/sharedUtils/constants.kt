@@ -2,6 +2,7 @@ package com.example.instagramclone.sharedUtils
 
 val fillerWords =
     listOf(
+        "i",
         "the",
         "that",
         "there",
