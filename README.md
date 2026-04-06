@@ -3,9 +3,12 @@
 </p>
 <h1 align="center"><b>Insta Clone</b></h1>
 <p align="center"><i>Built with Kotlin & Jetpack Compose</i></p>
-<br>
+<a href="https://github.com/tabbykaruga/InstaClone/releases/download/v1.0.0.0/insta-clone.apk">
+  <p>Download InstaClone APK</p>
+</a>
 
-<br>
+<br><br>
+
 <h3>Authentication Screens</h3>
 <table border="0" cellspacing="0" cellpadding="0">
   <tr>
